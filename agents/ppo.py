@@ -37,9 +37,9 @@ class ActorCriticNetwork(nn.Module):
 
 class PPO:
 
-    def __init__(self, env, config):
+    def __init__(self, env, device, config):
         self.env = env
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = device
         self.config = config
         self.n_observations = env.observation_space.shape[0]
         self.n_actions = env.action_space.n

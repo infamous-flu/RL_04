@@ -4,6 +4,25 @@ from dataclasses import dataclass, field
 
 @dataclass
 class DQNConfig:
+    '''
+    Configuration class for DQN agent settings.
+
+    Attributes:
+        batch_size (int): Size of the batch used in the learning process.
+        learning_rate (float): Learning rate for the optimizer.
+        epsilon (float): Initial value for the epsilon in the epsilon-greedy policy.
+        eps_min (float): Minimum value of epsilon.
+        eps_decay (float): Decay rate of epsilon per episode.
+        gamma (float): Discount factor for future rewards.
+        tau (float): Interpolation parameter for updating the target network.
+        memory_size (int): Size of the memory buffer.
+        score_to_beat (int): Score threshold after which the environment is considered solved.
+        scores_window_size (int): The rolling window size for averaging scores.
+        max_timesteps_per_episode (int): Maximum number of timesteps per episode.
+        model_save_frequency (int): Frequency of saving the model (in terms of episodes).
+        log_dir (str): Directory for storing logs.
+        save_path (str): Path to save the model.
+    '''
     batch_size: int = 64
     learning_rate: float = 5e-4
     epsilon: float = 1.0

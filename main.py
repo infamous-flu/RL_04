@@ -8,13 +8,14 @@ from config import DQNConfig, PPOConfig
 
 def main(agent_type):
     env = gym.make('LunarLander-v2')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     match agent_type:
         case 'dqn':
             config = DQNConfig()
-            agent = DQN(env, config)
+            agent = DQN(env, device, config)
         case 'ppo':
             config = PPOConfig()
-            agent = PPO(env, config)
+            agent = PPO(env, device, config)
     agent.learn(1e7)
     env.close()
 
