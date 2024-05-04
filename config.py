@@ -31,7 +31,7 @@ class DQNConfig:
     gamma: float = 0.99
     tau: float = 1e-3
     memory_size: int = int(1e5)
-    score_to_beat: int = 200
+    score_threshold: int = 200
     scores_window_size: int = 100
     max_timesteps_per_episode: int = 1000
     model_save_frequency: int = 10
@@ -47,12 +47,12 @@ class PPOConfig:
     learning_rate: float = 5e-4
     gamma: float = 0.99
     gae_lambda: float = 0.99
-    n_epochs: int = 4
-    n_minibatches: int = 4
+    n_epochs: int = 8
+    n_minibatches: int = 8
     clip: float = 0.2
     value_coef: float = 0.5
-    entropy_coef: float = 1e-4
-    score_to_beat: int = 200
+    entropy_coef: float = 1e-3
+    score_threshold: int = 200
     scores_window_size: int = 100
     max_timesteps_per_episode: int = 1000
     model_save_frequency: int = 10

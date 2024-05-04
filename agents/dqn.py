@@ -13,6 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import gymnasium as gym
 
+
 Experience = namedtuple('Experience', ('observation', 'action', 'next_observation', 'reward', 'done'))
 
 
@@ -130,8 +131,8 @@ class DQN:
         self.n_actions = env.action_space.n  # Number of possible actions
         self._init_hyperparameters()  # Initialize the hyperparameters based on the configuration
         self._init_networks()  # Set up the neural network architecture
-        self.writer = SummaryWriter(self.log_dir)  # Prepare the TensorBoard writer for logging
         self.memory = ReplayMemory(self.memory_size)  # Initialize the replay memory
+        self.writer = SummaryWriter(self.log_dir)  # Prepare the TensorBoard writer for logging
 
     def learn(self, n_timesteps: int):
         '''
@@ -144,17 +145,17 @@ class DQN:
         updating the network, and logging. It checks for the condition to terminate
         training if the agent's performance meets the target criteria.
         '''
-        self.i = 0  # Initialize episode counter
         self.t = 0  # Initialize global timestep counter
-        scores_window = deque([], maxlen=self.scores_window_size)  # Used for tracking the average score
+        self.i = 0  # Initialize episode counter
+        self.scores_window = deque([], maxlen=self.scores_window_size)  # Used for tracking the average score
 
         while self.t < n_timesteps:
             score = self.rollout()  # Perform one episode of interaction with the environment
-            scores_window.append(score)  # Record the score
-            average_score = np.mean(scores_window)  # Calculate the moving average score
+            self.scores_window.append(score)  # Record the score
+            average_score = np.mean(self.scores_window)  # Calculate the moving average score
 
             # Check for early stopping if the environment is considered solved
-            if average_score >= self.score_to_beat:
+            if average_score >= self.score_threshold:
                 print(f'\nEnvironment solved in {self.i - self.scores_window_size} episodes!', end='\t')
                 print(f'Average Score: {average_score: .4f}')
                 break
@@ -194,9 +195,7 @@ class DQN:
             score += reward  # Update the score
             self.memory.push(observation, action, next_observation, reward, done)  # Remember the experience
 
-            loss = self.train()  # Train the network using the stored experiences
-            if loss is not None:
-                self.writer.add_scalar('Loss', loss, self.t)  # Log the loss
+            self.train()  # Train the network using the stored experiences
 
             if done:  # If the episode is finished, exit the loop
                 break
@@ -204,7 +203,9 @@ class DQN:
             observation = next_observation  # Update the observation
 
         self.i += 1  # Increment the episode counter
-        self.writer.add_scalar('Episode/Score', score, self.i)  # Log the score
+        # Log the score
+        self.writer.add_scalar('Score', score, self.t)
+        self.writer.add_scalar('Episode/Score', score, self.i)
         self.writer.add_scalar('Episode/Length', episode_t + 1, self.i)  # Log the episode length
 
         return score
@@ -219,17 +220,17 @@ class DQN:
         Returns:
             int: The action to be taken.
         '''
-        # Decide whether to select the best action based on model prediction or sample randomly.
+        # Decide whether to select the best action based on model prediction or sample randomly
         if random.random() > self.epsilon:
-            # Convert the observation to a tensor and add a batch dimension (batch size = 1).
+            # Convert the observation to a tensor and add a batch dimension (batch size = 1)
             observation = torch.tensor(observation, dtype=torch.float32).unsqueeze(0).to(self.device)
-            # Model prediction: Compute Q-values for all actions, without gradient computation.
+            # Model prediction: Compute Q-values for all actions, without gradient computation
             with torch.no_grad():
                 q_values = self.policy_net(observation).squeeze()
-            # Select the action with the highest Q-value.
+            # Select the action with the highest Q-value
             action = torch.argmax(q_values).item()
         else:
-            # Randomly sample an action from the action space.
+            # Randomly sample an action from the action space
             action = self.env.action_space.sample()
         return action
 
@@ -264,6 +265,7 @@ class DQN:
 
         # Calculate loss using the Mean Squared Error loss function
         loss = self.MSELoss(current_q_values, target_q_values)
+        self.writer.add_scalar('Loss', loss, self.t)  # Log the loss
 
         # Perform backpropagation
         self.optimizer.zero_grad()
@@ -272,8 +274,6 @@ class DQN:
 
         # Update the target network parameters
         self.update_target_network()
-
-        return loss.item()
 
     def update_target_network(self):
         '''
@@ -332,11 +332,11 @@ class DQN:
         Returns:
             Tuple of Tensors: Prepared tensors of observations, actions, next_observations, rewards, and dones.
         '''
-        observations = torch.tensor(np.array(observations), dtype=torch.float32).to(self.device)
-        actions = torch.tensor(np.array(actions), dtype=torch.int64).to(self.device)
-        next_observations = torch.tensor(np.array(next_observations), dtype=torch.float32).to(self.device)
-        rewards = torch.tensor(np.array(rewards), dtype=torch.float32).to(self.device)
-        dones = torch.tensor(np.array(dones), dtype=torch.float32).to(self.device)
+        observations = torch.tensor(np.stack(observations), dtype=torch.float32).to(self.device)
+        actions = torch.tensor(np.stack(actions), dtype=torch.int64).to(self.device)
+        next_observations = torch.tensor(np.stack(next_observations), dtype=torch.float32).to(self.device)
+        rewards = torch.tensor(np.stack(rewards), dtype=torch.float32).to(self.device)
+        dones = torch.tensor(np.stack(dones), dtype=torch.float32).to(self.device)
         return observations, actions, next_observations, rewards, dones
 
     def _init_hyperparameters(self):
@@ -351,7 +351,7 @@ class DQN:
         self.gamma = self.config.gamma
         self.tau = self.config.tau
         self.memory_size = self.config.memory_size
-        self.score_to_beat = self.config.score_to_beat
+        self.score_threshold = self.config.score_threshold
         self.scores_window_size = self.config.scores_window_size
         self.max_timesteps_per_episode = self.config.max_timesteps_per_episode
         self.model_save_frequency = self.config.model_save_frequency
