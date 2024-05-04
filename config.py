@@ -35,6 +35,7 @@ class DQNConfig:
     scores_window_size: int = 100
     max_timesteps_per_episode: int = 1000
     model_save_frequency: int = 10
+    enable_logging: bool = True
     log_dir: str = \
         field(default_factory=lambda: f'runs/dqn/{datetime.now().strftime("%Y%m%d%H%M%S")}')
     save_path: str = \
@@ -47,15 +48,16 @@ class PPOConfig:
     learning_rate: float = 5e-4
     gamma: float = 0.99
     gae_lambda: float = 0.99
-    n_epochs: int = 8
-    n_minibatches: int = 8
+    n_epochs: int = 6
+    n_minibatches: int = 6
     clip: float = 0.2
     value_coef: float = 0.5
-    entropy_coef: float = 1e-3
+    entropy_coef: float = 5e-3
     score_threshold: int = 200
     scores_window_size: int = 100
     max_timesteps_per_episode: int = 1000
     model_save_frequency: int = 10
+    enable_logging: bool = True
     log_dir: str = \
         field(default_factory=lambda: f'runs/ppo/{datetime.now().strftime("%Y%m%d%H%M%S")}')
     save_path: str = \
