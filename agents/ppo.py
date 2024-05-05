@@ -206,16 +206,15 @@ class PPO:
             values.append(episode_values)
             dones.append(episode_dones)
 
-            self.episode_i += 1                          # Increment the episode counter
-            self.scores_window.append(score)             # Record the score
-            average_score = np.mean(self.scores_window)  # Calculate the moving average score
+            self.episode_i += 1               # Increment the episode counter
+            self.scores_window.append(score)  # Record the score
 
             if self.enable_logging:
-                self.writer.add_scalar('Common/TotalScore', score, self.t)                     # Log the score
-                self.writer.add_scalar('Common/AverageScore', average_score, self.t)           # Log the average score
-                self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)  # Log the episode length
+                self.writer.add_scalar('Common/TotalScore', score, self.t)                          # Log the score
+                self.writer.add_scalar('Common/AverageScore', np.mean(self.scores_window), self.t)  # Log the average score
+                self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)       # Log the episode length
 
-            # Stop the rollout if lower confidence bound meets the threshold
+            # Stop the rollout if environment is considered solved
             if self.is_environment_solved():
                 break
 
@@ -234,16 +233,16 @@ class PPO:
             dones (List[List[bool]]): Boolean flags indicating if an episode has ended.
         """
         # Calculate the advantage estimates using Generalized Advantage Estimation (GAE)
-        A_k = self.calculate_gae(rewards, values, dones)
+        advantages = self.calculate_gae(rewards, values, dones)
 
         # Prepare the data by converting to PyTorch tensors for neural network processing
-        observations, actions, log_probs, A_k = \
-            self._prepare_tensors(observations, actions, log_probs, A_k)
+        observations, actions, log_probs, advantages = \
+            self._prepare_tensors(observations, actions, log_probs, advantages)
 
         # Use the actor-critic network to predict the current value estimates
         with torch.no_grad():
             _, V = self.actor_critic(observations)
-        G_k = A_k + V.squeeze()  # Combine advantages with value estimates to get the returns
+        returns = advantages + V.squeeze()  # Combine advantages with value estimates to get the returns
 
         # Setup for minibatch learning
         batch_size = len(observations)
@@ -253,7 +252,7 @@ class PPO:
                            minibatch_size for i in range(self.n_minibatches)]
 
         cumulative_policy_loss, cumulative_value_loss, cumulative_entropy_loss = 0.0, 0.0, 0.0
-        for epoch in range(self.n_epochs):                        # Loop over the number of specified epochs
+        for _ in range(self.n_epochs):                        # Loop over the number of specified epochs
             indices = torch.randperm(batch_size).to(self.device)  # Shuffle indices for minibatch creation
             start = 0
             for minibatch_size in minibatch_sizes:
@@ -263,12 +262,12 @@ class PPO:
                 mini_observations = observations[mini_indices]
                 mini_actions = actions[mini_indices]
                 mini_log_probs = log_probs[mini_indices]
-                mini_advantage = A_k[mini_indices]
-                mini_returns = G_k[mini_indices]
+                mini_advantages = advantages[mini_indices]
+                mini_returns = returns[mini_indices]
 
                 # Normalize advantages to reduce variance and improve training stability
                 if self.normalize_advantage:
-                    mini_advantage = (mini_advantage - mini_advantage.mean()) / (mini_advantage.std() + 1e-10)
+                    mini_advantages = (mini_advantages - mini_advantages.mean()) / (mini_advantages.std() + 1e-10)
 
                 # Evaluate the current policy's performance on the minibatch to get new values, log probs, and entropy
                 new_V, new_log_probs, entropy = self.evaluate(mini_observations, mini_actions)
@@ -277,10 +276,10 @@ class PPO:
                 ratios = torch.exp(new_log_probs - mini_log_probs)
 
                 # Calculate the first part of the surrogate loss
-                surrogate_1 = ratios * mini_advantage
+                surrogate_1 = ratios * mini_advantages
 
                 # Calculate the second part of the surrogate loss, applying clipping to reduce variability
-                surrogate_2 = torch.clamp(ratios, 1 - self.clip_range, 1 + self.clip_range) * mini_advantage
+                surrogate_2 = torch.clamp(ratios, 1 - self.clip_range, 1 + self.clip_range) * mini_advantages
 
                 # Calculate the final policy loss using the clipped and unclipped surrogate losses
                 policy_loss = (-torch.min(surrogate_1, surrogate_2)).mean()
@@ -304,9 +303,9 @@ class PPO:
                 start = end  # Update the start index for the next minibatch
 
         if self.enable_logging:
-            mean_policy_loss = cumulative_policy_loss / (self.n_epochs * len(minibatch_sizes))
-            mean_value_loss = cumulative_value_loss / (self.n_epochs * len(minibatch_sizes))
-            mean_entropy_loss = cumulative_entropy_loss / (self.n_epochs * len(minibatch_sizes))
+            mean_policy_loss = cumulative_policy_loss / (self.n_epochs * self.n_minibatches)
+            mean_value_loss = cumulative_value_loss / (self.n_epochs * self.n_minibatches)
+            mean_entropy_loss = cumulative_entropy_loss / (self.n_epochs * self.n_minibatches)
 
             self.writer.add_scalar('PPO/PolicyLoss', mean_policy_loss, self.t)    # Log the policy loss
             self.writer.add_scalar('PPO/ValueLoss', mean_value_loss, self.t)      # Log the value loss
@@ -420,7 +419,6 @@ class PPO:
         # Calculate the mean score and standard deviation from the window
         mean_score = np.mean(self.scores_window)
         std_dev = np.std(self.scores_window, ddof=1)
-        # Compute the lower bound
         lower_bound = mean_score - std_dev
 
         return lower_bound > self.score_threshold
@@ -454,7 +452,7 @@ class PPO:
         if load_optimizer and 'optimizer_state_dict' in checkpoint:
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-    def _prepare_tensors(self, observations, actions, log_probs, A_k):
+    def _prepare_tensors(self, observations, actions, log_probs, advantages):
         """
         Converts lists of observations, actions, log probs, and advantages into tensors
         and sends them to the specified device.
@@ -463,16 +461,16 @@ class PPO:
             observations: List of observations from the environment.
             actions: List of actions taken.
             log_probs: List of log probabilities of the actions taken.
-            A_k: List of advantage estimates.
+            advantages: List of advantage estimates.
 
         Returns:
-            Tuple of Tensors: Prepared tensors of observations, actions, log_probs, and A_k.
+            Tuple of Tensors: Prepared tensors of observations, actions, log_probs, and advantages.
         """
         observations = torch.tensor(np.stack(observations), dtype=torch.float32).to(self.device)
         actions = torch.tensor(np.stack(actions), dtype=torch.int64).to(self.device)
         log_probs = torch.tensor(log_probs, dtype=torch.float32).to(self.device)
-        A_k = torch.tensor(A_k, dtype=torch.float32).to(self.device)
-        return observations, actions, log_probs, A_k
+        advantages = torch.tensor(advantages, dtype=torch.float32).to(self.device)
+        return observations, actions, log_probs, advantages
 
     def _set_seed(self, seed: int):
         """

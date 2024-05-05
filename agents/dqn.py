@@ -201,15 +201,14 @@ class DQN:
 
         self.epsilon = max(self.epsilon * self.eps_decay, self.eps_final)  # Update the exploration rate
 
-        self.episode_i += 1                          # Increment the episode counter
-        self.scores_window.append(score)             # Record the score
-        average_score = np.mean(self.scores_window)  # Calculate the moving average score
+        self.episode_i += 1               # Increment the episode counter
+        self.scores_window.append(score)  # Record the score
 
         if self.enable_logging:
-            self.writer.add_scalar('Common/TotalScore', score, self.t)                     # Log the total score
-            self.writer.add_scalar('Common/AverageScore', average_score, self.t)           # Log the average score
-            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)  # Log the episode length
-            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)            # Log epsilon
+            self.writer.add_scalar('Common/TotalScore', score, self.t)                          # Log the total score
+            self.writer.add_scalar('Common/AverageScore', np.mean(self.scores_window), self.t)  # Log the average score
+            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)       # Log the episode length
+            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)                 # Log epsilon
 
     def learn(self):
         """
@@ -314,7 +313,6 @@ class DQN:
         # Calculate the mean score and standard deviation from the window
         mean_score = np.mean(self.scores_window)
         std_dev = np.std(self.scores_window, ddof=1)
-        # Compute the lower bound
         lower_bound = mean_score - std_dev
 
         return lower_bound > self.score_threshold
