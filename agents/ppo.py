@@ -127,17 +127,17 @@ class PPO:
         self.scores_window = deque([], maxlen=self.scores_window_size)  # Used for tracking the average score
 
         while self.t < n_timesteps:
-            observations, actions, log_probs, rewards, \
-                values, dones, average_score = self.rollout()  # Collect batch of trajectories
+            observations, actions, log_probs, rewards, values, dones = self.rollout()  # Collect a batch of trajectories
             self.batch_i += 1
 
             # Check for early stopping if the environment is considered solved
+            average_score = np.mean(self.scores_window)
             if average_score >= self.score_threshold:
                 print(f'\nEnvironment solved in {self.episode_i} episodes!', end='\t')
                 print(f'Average Score: {average_score: .4f}')
                 break
 
-            # Perform learning update using the collected batch of trajectories
+            # Learn using the collected batch of trajectories
             self.learn(observations, actions, log_probs, rewards, values, dones)
 
             # Save the model at specified intervals
@@ -150,7 +150,7 @@ class PPO:
             self.writer.close()
 
     def rollout(self) -> Tuple[List[np.ndarray], List[int], List[torch.Tensor],
-                               List[float], List[torch.Tensor], List[bool], float]:
+                               List[float], List[torch.Tensor], List[bool]]:
         """
         Executes one rollout to collect training data until a batch of trajectories is filled
         or average score meets the threshold.
@@ -163,7 +163,6 @@ class PPO:
             - rewards (float): Rewards received after taking actions.
             - values (torch.Tensor): Estimated value functions from the critic network.
             - dones (bool): Boolean flags indicating if an episode has ended.
-            - average_score (float): The average score achieved by the agent over the score window.
         """
         batch_t = 0  # Initialize batch timestep counter
         observations, actions, log_probs, rewards, values, dones = [], [], [], [], [], []
@@ -182,7 +181,7 @@ class PPO:
                 next_observation, reward, terminated, truncated, _ = self.env.step(action)  # Take the action
                 done = terminated or truncated                                              # Determine if the episode has ended
 
-                score += reward                  # Update the score
+                score += reward                   # Update the score
                 observations.append(observation)
                 actions.append(action)
                 log_probs.append(log_prob)
@@ -215,7 +214,7 @@ class PPO:
             if self.episode_i % self.scores_window_size == 0:
                 print(f'Episode {self.episode_i}\tAverage Score: {average_score:.4f}')
 
-        return observations, actions, log_probs, rewards, values, dones, average_score
+        return observations, actions, log_probs, rewards, values, dones
 
     def learn(self, observations, actions, log_probs, rewards, values, dones):
         """
@@ -232,7 +231,7 @@ class PPO:
         # Calculate the advantage estimates using Generalized Advantage Estimation (GAE)
         A_k = self.calculate_gae(rewards, values, dones)
 
-        # Prepare the data by to PyTorch tensors for neural network processing
+        # Prepare the data by converting to PyTorch tensors for neural network processing
         observations, actions, log_probs, A_k = \
             self._prepare_tensors(observations, actions, log_probs, A_k)
 
@@ -248,7 +247,7 @@ class PPO:
         minibatch_sizes = [minibatch_size + 1 if i < remainder else
                            minibatch_size for i in range(self.n_minibatches)]
 
-        cumulative_loss, cumulative_policy_loss, cumulative_value_loss = 0.0, 0.0, 0.0
+        cumulative_policy_loss, cumulative_value_loss = 0.0, 0.0
         for epoch in range(self.n_epochs):                        # Loop over the number of specified epochs
             indices = torch.randperm(batch_size).to(self.device)  # Shuffle indices for minibatch creation
             start = 0
@@ -266,7 +265,7 @@ class PPO:
                 mini_advantage = (mini_advantage - mini_advantage.mean()) / (mini_advantage.std() + 1e-10)
 
                 # Evaluate the current policy's performance on the minibatch to get new values, log probs, and entropy
-                V, new_log_probs, entropy = self.evaluate(mini_observations, mini_actions)
+                new_V, new_log_probs, entropy = self.evaluate(mini_observations, mini_actions)
 
                 # Calculate the ratios of the new log probabilities to the old log probabilities
                 ratios = torch.exp(new_log_probs - mini_log_probs)
@@ -280,14 +279,13 @@ class PPO:
                 # Calculate the final policy loss using the clipped and unclipped surrogate losses
                 policy_loss = (-torch.min(surrogate_1, surrogate_2)).mean()
 
-                # Calculate the value loss using mean squared error between predicted and actual returns
-                value_loss = self.MSELoss(V.squeeze(), mini_returns)
+                # Calculate the value loss using Mean Squared Error between predicted and actual returns
+                value_loss = self.MSELoss(new_V.squeeze(), mini_returns)
 
                 # Combine the policy and value losses, adjusting for entropy to promote exploration
                 loss = policy_loss + self.value_coef * value_loss - self.entropy_coef * entropy.mean()
 
                 # Accumulate losses for monitoring
-                cumulative_loss += loss
                 cumulative_policy_loss += policy_loss
                 cumulative_value_loss += value_loss
 
@@ -299,7 +297,6 @@ class PPO:
                 start = end  # Update the start index for the next minibatch
 
         if self.enable_logging:
-            self.writer.add_scalar('Loss', cumulative_loss / (epoch + 1), self.t)                # Log the loss
             self.writer.add_scalar('Loss/Policy', cumulative_policy_loss / (epoch + 1), self.t)  # Log the policy loss
             self.writer.add_scalar('Loss/Value', cumulative_value_loss / (epoch + 1), self.t)    # Log the value loss
 
@@ -313,7 +310,7 @@ class PPO:
                                   If False, the action is sampled stochastically according to the policy distribution.
 
         Returns:
-            int: The action selected by the agent.
+            int: The action selected by the agent when deterministic is True.
             tuple: A tuple containing the following when deterministic is False:
                 - int: The action selected by the agent.
                 - torch.Tensor: The log probability of the selected action.
@@ -321,11 +318,9 @@ class PPO:
         """
         # Convert the observation to a tensor and add a batch dimension (batch size = 1)
         observation = torch.tensor(observation, dtype=torch.float32).unsqueeze(0).to(self.device)
-
-        # Model prediction: Get action logits and state value estimate
+        # Model prediction: Get logits and state value estimate
         with torch.no_grad():
             logits, V = self.actor_critic(observation)
-
         # Decide whether to select the best action based on model prediction or sample stochastically
         if deterministic:
             # Select the action with the highest probability
@@ -351,9 +346,9 @@ class PPO:
             torch.Tensor: The log probabilities of the taken actions.
             torch.Tensor: The entropy of the policy distribution.
         """
-        logits, V = self.actor_critic(observations)  # Forward pass through the actor-critic network
-        dist = Categorical(logits=logits)            # Create a categorical distribution based on the logits
-        log_probs = dist.log_prob(actions)           # Calculate the log probabilities of the actions
+        logits, V = self.actor_critic(observations)    # Forward pass through the actor-critic network
+        dist = Categorical(logits=logits)              # Create a categorical distribution based on the logits
+        log_probs = dist.log_prob(actions)             # Calculate the log probabilities of the actions
         return V.squeeze(), log_probs, dist.entropy()
 
     def calculate_return(self, episode_rewards: List[float]) -> float:

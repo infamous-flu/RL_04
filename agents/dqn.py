@@ -142,45 +142,35 @@ class DQN:
             n_timesteps (int): The number of timesteps to train the agent.
         """
         self.t = 0                                                      # Initialize global timestep counter
-        self.i = 0                                                      # Initialize episode counter
+        self.episode_i = 0                                              # Initialize episode counter
         self.scores_window = deque([], maxlen=self.scores_window_size)  # Used for tracking the average score
 
         while self.t < n_timesteps:
-            score = self.rollout()                       # Perform one episode of interaction with the environment
-            self.scores_window.append(score)             # Record the score
-            average_score = np.mean(self.scores_window)  # Calculate the moving average score
-            if self.enable_logging:
-                self.writer.add_scalar('Training/Average Score', average_score, self.t)  # Log the average score
+            self.rollout()  # Perform one episode of interaction with the environment
 
             # Check for early stopping if the environment is considered solved
+            average_score = np.mean(self.scores_window)
             if average_score >= self.score_threshold:
-                print(f'\nEnvironment solved in {self.i} episodes!', end='\t')
+                print(f'\nEnvironment solved in {self.episode_i} episodes!', end='\t')
                 print(f'Average Score: {average_score: .4f}')
                 break
 
-            # Print progress periodically
-            if self.i % self.scores_window_size == 0:
-                print(f'Episode {self.i}\tAverage Score: {average_score:.4f}')
-
             # Save the model at specified intervals
-            if self.i % self.model_save_frequency == 0:
+            if self.episode_i % self.model_save_frequency == 0:
                 self.save_model(self.save_path)
-
-            # Update the exploration rate
-            self.epsilon = max(self.epsilon * self.eps_decay, self.eps_min)
 
         # Final save and close the logger
         self.save_model(self.save_path)
         if self.writer is not None:
             self.writer.close()
 
-    def rollout(self) -> float:
+    def rollout(self):
         """
-        Executes one episode of interaction with the environment, collecting
-        experience and training the Q network.
+        Executes one episode of interaction with the environment, collecting experience
+        and training the Q network.
 
         Returns:
-            float: The total reward accumulated over the episode.
+            None
         """
         score = 0                          # Initialize score for the episode
         observation, _ = self.env.reset()  # Reset the environment and get the initial observation
@@ -194,31 +184,35 @@ class DQN:
             score += reward                                                        # Update the score
             self.memory.push(observation, action, next_observation, reward, done)  # Remember the experience
 
-            self.learn()  # Train the network using the collected experiences
+            self.learn()  # Learn using the collected experiences
 
             if done:
                 break  # If the episode is finished, exit the loop
 
             observation = next_observation  # Update the observation
 
-        self.i += 1  # Increment the episode counter
+        self.epsilon = max(self.epsilon * self.eps_decay, self.eps_min)  # Update the exploration rate
+
+        self.episode_i += 1                          # Increment the episode counter
+        self.scores_window.append(score)             # Record the score
+        average_score = np.mean(self.scores_window)  # Calculate the moving average score
 
         if self.enable_logging:
-            self.writer.add_scalar('Episode/Score', score, self.i)           # Log the score
-            self.writer.add_scalar('Episode/Length', episode_t + 1, self.i)  # Log the episode length
+            self.writer.add_scalar('Training/Average Score', average_score, self.t)  # Log the average score
+            self.writer.add_scalar('Episode/Score', score, self.episode_i)           # Log the score
+            self.writer.add_scalar('Episode/Length', episode_t + 1, self.episode_i)  # Log the episode length
 
-        return score
+        # Print progress periodically
+        if self.episode_i % self.scores_window_size == 0:
+            print(f'Episode {self.episode_i}\tAverage Score: {average_score:.4f}')
 
     def learn(self):
         """
-        Trains the Q network using a batch of experiences from memory.
-
-        Returns:
-            float or None: The loss for the training step, or None if not enough samples are available.
+        Performs a learning update using the Deep Q-Learning (DQN) algorithm.
         """
         # Check if enough samples are available in memory
         if len(self.memory) < self.batch_size:
-            return None
+            return
 
         # Sample a batch of experiences from memory
         experiences = self.memory.sample(self.batch_size)
@@ -258,8 +252,8 @@ class DQN:
 
         Args:
             observation (NDArray[np.float32]): The current state observation from the environment.
-            deterministic (bool): If True, the action choice is deterministic (the max probability action).
-                                  If False, 
+            deterministic (bool): If True, the action choice is deterministic (the max value action).
+                                  If False, the action is chosen stochastically with epsilon-greedy.
 
         Returns:
             int: The action selected by the agent.
@@ -278,14 +272,6 @@ class DQN:
             action = self.env.action_space.sample()
         return action
 
-    def update_target_network(self):
-        """
-        Updates the target network by partially copying the weights from the policy network.
-        This helps stabilize the learning process.
-        """
-        for policy_param, target_param in zip(self.policy_net.parameters(), self.target_net.parameters()):
-            target_param.data.copy_(self.tau * policy_param.data + (1 - self.tau) * target_param.data)
-
     def calculate_return(self, episode_rewards: List[float]) -> float:
         """
         Calculates the discounted return for an episode.
@@ -301,6 +287,14 @@ class DQN:
         for reward in reversed(episode_rewards):
             episode_return = reward + self.gamma * episode_return
         return episode_return
+
+    def update_target_network(self):
+        """
+        Updates the target network by partially copying the weights from the policy network.
+        This helps stabilize the learning process.
+        """
+        for policy_param, target_param in zip(self.policy_net.parameters(), self.target_net.parameters()):
+            target_param.data.copy_(self.tau * policy_param.data + (1 - self.tau) * target_param.data)
 
     def save_model(self, file_path: str):
         """
