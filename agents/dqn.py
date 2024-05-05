@@ -303,8 +303,7 @@ class DQN:
 
     def is_environment_solved(self):
         """
-        Check if the environment is solved by evaluating whether the lower bound
-        is above the defined score threshold.
+        Check if the environment is solved.
 
         Returns:
             bool: True if the environment is solved, False otherwise.
