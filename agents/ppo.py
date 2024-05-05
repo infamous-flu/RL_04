@@ -94,9 +94,10 @@ class PPO:
         env (gym.Env): The environment in which the agent operates.
         device (torch.device): The device (CPU or GPU) on which the computations are performed.
         config (PPOConfig): Configuration parameters for setting up the PPO agent.
+        seed (int): Seed for the pseudo random generators.
     """
 
-    def __init__(self, env: gym.Env, device: torch.device, config):
+    def __init__(self, env: gym.Env, device: torch.device, config, seed: int = None):
         """
         Initializes the PPO agent with the environment, device, and configuration.
 
@@ -104,10 +105,15 @@ class PPO:
             env (gym.Env): The gym environment.
             device (torch.device): The device (CPU or GPU) to perform computations.
             config (PPOConfig): A dataclass containing all necessary hyperparameters.
+            seed (int): Seed for the pseudo random generators.
         """
         self.env = env                                        # The gym environment where the agent will interact
         self.device = device                                  # The computation device (CPU or GPU)
         self.config = config                                  # Configuration containing all hyperparameters
+        self.seed = seed                                      # Seed for the pseudo random generators
+        if self.seed is not None:
+            self._set_seed(self.seed)
+        self._set_seed(seed)                                  # Set the seed in various components
         self.n_observations = env.observation_space.shape[0]  # Number of features in the observation space
         self.n_actions = env.action_space.n                   # Number of possible actions
         self._init_hyperparameters()                          # Initialize the hyperparameters based on the configuration
@@ -262,7 +268,8 @@ class PPO:
                 mini_returns = G_k[mini_indices]
 
                 # Normalize advantages to reduce variance and improve training stability
-                mini_advantage = (mini_advantage - mini_advantage.mean()) / (mini_advantage.std() + 1e-10)
+                if self.normalize_advantage:
+                    mini_advantage = (mini_advantage - mini_advantage.mean()) / (mini_advantage.std() + 1e-10)
 
                 # Evaluate the current policy's performance on the minibatch to get new values, log probs, and entropy
                 new_V, new_log_probs, entropy = self.evaluate(mini_observations, mini_actions)
@@ -274,7 +281,7 @@ class PPO:
                 surrogate_1 = ratios * mini_advantage
 
                 # Calculate the second part of the surrogate loss, applying clipping to reduce variability
-                surrogate_2 = torch.clamp(ratios, 1 - self.clip, 1 + self.clip) * mini_advantage
+                surrogate_2 = torch.clamp(ratios, 1 - self.clip_range, 1 + self.clip_range) * mini_advantage
 
                 # Calculate the final policy loss using the clipped and unclipped surrogate losses
                 policy_loss = (-torch.min(surrogate_1, surrogate_2)).mean()
@@ -395,23 +402,34 @@ class PPO:
             advantages.extend(episode_advantages)
         return advantages
 
-    def save_model(self, file_path):
+    def save_model(self, file_path, save_optimizer=False):
         """
         Saves the actor-critic network's model parameters to the specified file path.
+        Optionally, it also saves the optimizer state.
 
         Args:
             file_path (str): The path to the file where the model parameters are to be saved.
+            save_optimizer (bool): If True, saves the optimizer state as well. Defaults to False.
         """
-        torch.save(self.actor_critic.state_dict(), file_path)
+        checkpoint = {
+            'model_state_dict': self.actor_critic.state_dict()
+        }
+        if save_optimizer:
+            checkpoint['optimizer_state_dict'] = self.optimizer.state_dict()
+        torch.save(checkpoint, file_path)
 
-    def load_model(self, file_path):
+    def load_model(self, file_path, load_optimizer=False):
         """
-        Loads model parameters into the actor-critic network.
+        Loads model parameters into the actor-critic network, and optionally loads the optimizer state.
 
         Args:
             file_path (str): The path to the file from which to load the model parameters.
+            load_optimizer (bool): If True, loads the optimizer state as well. Defaults to False.
         """
-        self.actor_critic.load_state_dict(torch.load(file_path))
+        checkpoint = torch.load(file_path)
+        self.actor_critic.load_state_dict(checkpoint['model_state_dict'])
+        if load_optimizer and 'optimizer_state_dict' in checkpoint:
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     def _prepare_tensors(self, observations, actions, log_probs, A_k):
         """
@@ -433,17 +451,36 @@ class PPO:
         A_k = torch.tensor(A_k, dtype=torch.float32).to(self.device)
         return observations, actions, log_probs, A_k
 
+    def _set_seed(self, seed: int):
+        """
+        Sets the seed for reproducibility in various components.
+
+        Args:
+            seed (int): The seed value to be used.
+        """
+        # Seed the Gym environment
+        self.env.reset(seed=seed)
+        self.env.action_space.seed(seed)
+        self.env.observation_space.seed(seed)
+        # Seed NumPy's random generator
+        np.random.seed(seed)
+        # Seed PyTorch for reproducibility in computations
+        torch.manual_seed(seed)
+        if self.device.type == 'cuda':
+            torch.cuda.manual_seed_all(seed)
+
     def _init_hyperparameters(self):
         """
         Initializes hyperparameters from the configuration.
         """
-        self.max_timesteps_per_batch = self.config.max_timesteps_per_batch
         self.learning_rate = self.config.learning_rate
+        self.max_timesteps_per_batch = self.config.max_timesteps_per_batch
+        self.n_minibatches = self.config.n_minibatches
+        self.n_epochs = self.config.n_epochs
+        self.clip_range = self.config.clip_range
         self.gamma = self.config.gamma
         self.gae_lambda = self.config.gae_lambda
-        self.n_epochs = self.config.n_epochs
-        self.n_minibatches = self.config.n_minibatches
-        self.clip = self.config.clip
+        self.normalize_advantage = self.config.normalize_advantage
         self.value_coef = self.config.value_coef
         self.entropy_coef = self.config.entropy_coef
         self.score_threshold = self.config.score_threshold
