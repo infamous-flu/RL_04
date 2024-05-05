@@ -112,8 +112,7 @@ class PPO:
         self.config = config                                  # Configuration containing all hyperparameters
         self.seed = seed                                      # Seed for the pseudo random generators
         if self.seed is not None:
-            self._set_seed(self.seed)
-        self._set_seed(seed)                                  # Set the seed in various components
+            self._set_seed(self.seed)                         # Set the seed in various components
         self.n_observations = env.observation_space.shape[0]  # Number of features in the observation space
         self.n_actions = env.action_space.n                   # Number of possible actions
         self._init_hyperparameters()                          # Initialize the hyperparameters based on the configuration
