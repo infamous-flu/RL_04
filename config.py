@@ -20,9 +20,11 @@ class DQNConfig:
         eps_final (float): Final value of epsilon.
         eps_decay (float): Decay rate of epsilon per episode.
         score_threshold (int): Score threshold after which the environment is considered solved.
+        std_deviation_factor (float): The number of standard deviations to subtract from the mean score.
         scores_window_size (int): The rolling window size for averaging scores.
         max_timesteps_per_episode (int): Maximum number of timesteps per episode.
         model_save_frequency (int): Frequency of saving the model (in terms of episodes).
+        print_every (int): Frequency of printing the average score.
         enable_logging (bool): Flag to enable or disable logging.
         log_dir (str): Directory for storing logs.
         save_path (str): Path to save the model.
@@ -38,9 +40,11 @@ class DQNConfig:
     eps_final: float = 0.01
     eps_decay: float = 0.995
     score_threshold: int = 200
+    std_deviation_factor: float = 1.5
     scores_window_size: int = 100
     max_timesteps_per_episode: int = 1000
     model_save_frequency: int = 10
+    print_every: int = int(1e5)
     enable_logging: bool = True
     log_dir: str = \
         field(default_factory=lambda: f'runs/dqn/{datetime.now().strftime("%Y%m%d%H%M%S")}')
@@ -65,9 +69,11 @@ class PPOConfig:
         value_coef (float): Coefficient for the value loss in the total loss calculation.
         entropy_coef (float): Coefficient for the entropy bonus in the total loss calculation.
         score_threshold (int): Score threshold after which the environment is considered solved.
+        std_deviation_factor (float): The number of standard deviations to subtract from the mean score.
         scores_window_size (int): The rolling window size for averaging scores.
         max_timesteps_per_episode (int): Maximum number of timesteps per episode.
         model_save_frequency (int): Frequency of saving the model (in terms of batch iterations).
+        print_every (int): Frequency of printing the average score.
         enable_logging (bool): Flag to enable or disable logging.
         log_dir (str): Directory for storing logs.
         save_path (str): Path to save the model.
@@ -83,9 +89,11 @@ class PPOConfig:
     value_coef: float = 0.5
     entropy_coef: float = 1e-3
     score_threshold: int = 200
+    std_deviation_factor: float = 1.5
     scores_window_size: int = 100
     max_timesteps_per_episode: int = 1000
     model_save_frequency: int = 10
+    print_every: int = int(1e5)
     enable_logging: bool = True
     log_dir: str = \
         field(default_factory=lambda: f'runs/ppo/{datetime.now().strftime("%Y%m%d%H%M%S")}')

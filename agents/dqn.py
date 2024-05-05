@@ -153,11 +153,9 @@ class DQN:
         while self.t < n_timesteps:
             self.rollout()  # Perform one episode of interaction with the environment
 
-            # Check for early stopping if the environment is considered solved
-            average_score = np.mean(self.scores_window)
-            if average_score >= self.score_threshold:
-                print(f'\nEnvironment solved in {self.episode_i} episodes!', end='\t')
-                print(f'Average Score: {average_score: .4f}')
+            if self.is_environment_solved():
+                print(f'\nEnvironment solved in {self.t} timesteps!', end='\t')
+                print(f'Average Score: {np.mean(self.scores_window):.3f}')
                 break
 
             # Save the model at specified intervals
@@ -189,8 +187,12 @@ class DQN:
             score += reward                                                        # Update the score
             self.memory.push(observation, action, next_observation, reward, done)  # Remember the experience
 
-            if self.t >= self.learning_start and self.t % self.learn_frequency == 0:
+            if self.t >= self.learning_starts and self.t % self.learn_frequency == 0:
                 self.learn()  # Learn using the collected experiences
+
+            # Print progress periodically
+            if self.t % self.print_every == 0:
+                print(f'Timestep {self.t}\tAverage Score: {np.mean(self.scores_window):.3f}')
 
             if done:
                 break  # If the episode is finished, exit the loop
@@ -204,13 +206,10 @@ class DQN:
         average_score = np.mean(self.scores_window)  # Calculate the moving average score
 
         if self.enable_logging:
-            self.writer.add_scalar('Training/Average Score', average_score, self.t)  # Log the average score
-            self.writer.add_scalar('Episode/Score', score, self.episode_i)           # Log the score
-            self.writer.add_scalar('Episode/Length', episode_t + 1, self.episode_i)  # Log the episode length
-
-        # Print progress periodically
-        if self.episode_i % self.scores_window_size == 0:
-            print(f'Episode {self.episode_i}\tAverage Score: {average_score:.4f}')
+            self.writer.add_scalar('Common/TotalScore', score, self.t)                     # Log the total score
+            self.writer.add_scalar('Common/AverageScore', average_score, self.t)           # Log the average score
+            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)  # Log the episode length
+            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)            # Log epsilon
 
     def learn(self):
         """
@@ -250,7 +249,7 @@ class DQN:
         self.update_target_network()
 
         if self.enable_logging:
-            self.writer.add_scalar('Loss/Training', loss, self.t)  # Log the loss
+            self.writer.add_scalar('DQN/Loss', loss, self.t)  # Log the loss
 
     def select_action(self, observation: NDArray[np.float32], deterministic=False) -> int:
         """
@@ -301,6 +300,25 @@ class DQN:
         """
         for policy_param, target_param in zip(self.policy_net.parameters(), self.target_net.parameters()):
             target_param.data.copy_(self.tau * policy_param.data + (1 - self.tau) * target_param.data)
+
+    def is_environment_solved(self):
+        """
+        Check if the environment is solved by evaluating whether the lower confidence bound
+        is above the defined score threshold.
+
+        Returns:
+            bool: True if the environment is solved, False otherwise.
+        """
+        if len(self.scores_window) < self.scores_window_size:
+            return False  # Not enough scores for a valid evaluation
+
+        # Calculate the mean score and standard deviation from the window
+        mean_score = np.mean(self.scores_window)
+        std_dev = np.std(self.scores_window, ddof=1)
+        # Compute the lower confidence bound
+        lower_bound = mean_score - (self.std_deviation_factor * std_dev)
+
+        return lower_bound > self.score_threshold
 
     def save_model(self, file_path, save_optimizer=False):
         """
@@ -380,7 +398,7 @@ class DQN:
         """
         self.learning_rate = self.config.learning_rate
         self.buffer_size = self.config.buffer_size
-        self.learning_start = self.config.learning_start
+        self.learning_starts = self.config.learning_starts
         self.batch_size = self.config.batch_size
         self.tau = self.config.tau
         self.gamma = self.config.gamma
@@ -389,9 +407,11 @@ class DQN:
         self.eps_final = self.config.eps_final
         self.eps_decay = self.config.eps_decay
         self.score_threshold = self.config.score_threshold
+        self.std_deviation_factor = self.config.std_deviation_factor
         self.scores_window_size = self.config.scores_window_size
         self.max_timesteps_per_episode = self.config.max_timesteps_per_episode
         self.model_save_frequency = self.config.model_save_frequency
+        self.print_every = self.config.print_every
         self.enable_logging = self.config.enable_logging
         self.log_dir = self.config.log_dir
         self.save_path = self.config.save_path

@@ -137,10 +137,9 @@ class PPO:
             self.batch_i += 1
 
             # Check for early stopping if the environment is considered solved
-            average_score = np.mean(self.scores_window)
-            if average_score >= self.score_threshold:
-                print(f'\nEnvironment solved in {self.episode_i} episodes!', end='\t')
-                print(f'Average Score: {average_score: .4f}')
+            if self.is_environment_solved():
+                print(f'\nEnvironment solved in {self.t} timesteps!', end='\t')
+                print(f'Average Score: {np.mean(self.scores_window):.3f}')
                 break
 
             # Learn using the collected batch of trajectories
@@ -194,6 +193,10 @@ class PPO:
                 episode_rewards.append(reward)
                 episode_values.append(V)
 
+                # Print progress periodically
+                if self.t % self.print_every == 0:
+                    print(f'Timestep {self.t}\tAverage Score: {np.mean(self.scores_window):.3f}')
+
                 if done:
                     break  # If the episode is finished, exit the loop
 
@@ -208,17 +211,13 @@ class PPO:
             average_score = np.mean(self.scores_window)  # Calculate the moving average score
 
             if self.enable_logging:
-                self.writer.add_scalar('Training/Average Score', average_score, self.t)  # Log the average score
-                self.writer.add_scalar('Episode/Score', score, self.episode_i)           # Log the score
-                self.writer.add_scalar('Episode/Length', episode_t + 1, self.episode_i)  # Log the episode length
+                self.writer.add_scalar('Common/TotalScore', score, self.t)                     # Log the score
+                self.writer.add_scalar('Common/AverageScore', average_score, self.t)           # Log the average score
+                self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)  # Log the episode length
 
-            # Stop the rollout if average score meets the threshold
-            if average_score >= self.score_threshold:
+            # Stop the rollout if lower confidence bound meets the threshold
+            if self.is_environment_solved():
                 break
-
-            # Print progress periodically
-            if self.episode_i % self.scores_window_size == 0:
-                print(f'Episode {self.episode_i}\tAverage Score: {average_score:.4f}')
 
         return observations, actions, log_probs, rewards, values, dones
 
@@ -253,7 +252,7 @@ class PPO:
         minibatch_sizes = [minibatch_size + 1 if i < remainder else
                            minibatch_size for i in range(self.n_minibatches)]
 
-        cumulative_policy_loss, cumulative_value_loss = 0.0, 0.0
+        cumulative_policy_loss, cumulative_value_loss, cumulative_entropy_loss = 0.0, 0.0, 0.0
         for epoch in range(self.n_epochs):                        # Loop over the number of specified epochs
             indices = torch.randperm(batch_size).to(self.device)  # Shuffle indices for minibatch creation
             start = 0
@@ -295,6 +294,7 @@ class PPO:
                 # Accumulate losses for monitoring
                 cumulative_policy_loss += policy_loss
                 cumulative_value_loss += value_loss
+                cumulative_entropy_loss += entropy.mean()
 
                 # Perform backpropagation
                 self.optimizer.zero_grad()
@@ -304,8 +304,13 @@ class PPO:
                 start = end  # Update the start index for the next minibatch
 
         if self.enable_logging:
-            self.writer.add_scalar('Loss/Policy', cumulative_policy_loss / (epoch + 1), self.t)  # Log the policy loss
-            self.writer.add_scalar('Loss/Value', cumulative_value_loss / (epoch + 1), self.t)    # Log the value loss
+            mean_policy_loss = cumulative_policy_loss / (self.n_epochs * len(minibatch_sizes))
+            mean_value_loss = cumulative_value_loss / (self.n_epochs * len(minibatch_sizes))
+            mean_entropy_loss = cumulative_entropy_loss / (self.n_epochs * len(minibatch_sizes))
+
+            self.writer.add_scalar('PPO/PolicyLoss', mean_policy_loss, self.t)    # Log the policy loss
+            self.writer.add_scalar('PPO/ValueLoss', mean_value_loss, self.t)      # Log the value loss
+            self.writer.add_scalar('PPO/EntropyLoss', mean_entropy_loss, self.t)  # Log the entropy loss
 
     def select_action(self, observation: NDArray[np.float32], deterministic=False):
         """
@@ -402,6 +407,25 @@ class PPO:
             advantages.extend(episode_advantages)
         return advantages
 
+    def is_environment_solved(self):
+        """
+        Check if the environment is solved by evaluating whether the lower confidence bound
+        is above the defined score threshold.
+
+        Returns:
+            bool: True if the environment is solved, False otherwise.
+        """
+        if len(self.scores_window) < self.scores_window_size:
+            return False  # Not enough scores for a valid evaluation
+
+        # Calculate the mean score and standard deviation from the window
+        mean_score = np.mean(self.scores_window)
+        std_dev = np.std(self.scores_window, ddof=1)
+        # Compute the lower confidence bound
+        lower_bound = mean_score - (self.std_deviation_factor * std_dev)
+
+        return lower_bound > self.score_threshold
+
     def save_model(self, file_path, save_optimizer=True):
         """
         Saves the actor-critic network's model parameters to the specified file path.
@@ -484,9 +508,11 @@ class PPO:
         self.value_coef = self.config.value_coef
         self.entropy_coef = self.config.entropy_coef
         self.score_threshold = self.config.score_threshold
+        self.std_deviation_factor = self.config.std_deviation_factor
         self.scores_window_size = self.config.scores_window_size
         self.max_timesteps_per_episode = self.config.max_timesteps_per_episode
         self.mode_save_frequency = self.config.model_save_frequency
+        self.print_every = self.config.print_every
         self.enable_logging = self.config.enable_logging
         self.log_dir = self.config.log_dir
         self.save_path = self.config.save_path
