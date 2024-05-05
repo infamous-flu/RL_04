@@ -402,7 +402,7 @@ class PPO:
             advantages.extend(episode_advantages)
         return advantages
 
-    def save_model(self, file_path, save_optimizer=False):
+    def save_model(self, file_path, save_optimizer=True):
         """
         Saves the actor-critic network's model parameters to the specified file path.
         Optionally, it also saves the optimizer state.
@@ -418,7 +418,7 @@ class PPO:
             checkpoint['optimizer_state_dict'] = self.optimizer.state_dict()
         torch.save(checkpoint, file_path)
 
-    def load_model(self, file_path, load_optimizer=False):
+    def load_model(self, file_path, load_optimizer=True):
         """
         Loads model parameters into the actor-critic network, and optionally loads the optimizer state.
 
