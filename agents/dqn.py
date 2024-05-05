@@ -303,7 +303,7 @@ class DQN:
 
     def is_environment_solved(self):
         """
-        Check if the environment is solved by evaluating whether the lower confidence bound
+        Check if the environment is solved by evaluating whether the lower bound
         is above the defined score threshold.
 
         Returns:
@@ -315,8 +315,8 @@ class DQN:
         # Calculate the mean score and standard deviation from the window
         mean_score = np.mean(self.scores_window)
         std_dev = np.std(self.scores_window, ddof=1)
-        # Compute the lower confidence bound
-        lower_bound = mean_score - (self.std_deviation_factor * std_dev)
+        # Compute the lower bound
+        lower_bound = mean_score - std_dev
 
         return lower_bound > self.score_threshold
 
@@ -407,7 +407,6 @@ class DQN:
         self.eps_final = self.config.eps_final
         self.eps_decay = self.config.eps_decay
         self.score_threshold = self.config.score_threshold
-        self.std_deviation_factor = self.config.std_deviation_factor
         self.scores_window_size = self.config.scores_window_size
         self.max_timesteps_per_episode = self.config.max_timesteps_per_episode
         self.model_save_frequency = self.config.model_save_frequency

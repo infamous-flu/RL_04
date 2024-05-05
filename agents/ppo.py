@@ -409,8 +409,7 @@ class PPO:
 
     def is_environment_solved(self):
         """
-        Check if the environment is solved by evaluating whether the lower confidence bound
-        is above the defined score threshold.
+        Check if the environment is solved.
 
         Returns:
             bool: True if the environment is solved, False otherwise.
@@ -421,8 +420,8 @@ class PPO:
         # Calculate the mean score and standard deviation from the window
         mean_score = np.mean(self.scores_window)
         std_dev = np.std(self.scores_window, ddof=1)
-        # Compute the lower confidence bound
-        lower_bound = mean_score - (self.std_deviation_factor * std_dev)
+        # Compute the lower bound
+        lower_bound = mean_score - std_dev
 
         return lower_bound > self.score_threshold
 
@@ -508,7 +507,6 @@ class PPO:
         self.value_coef = self.config.value_coef
         self.entropy_coef = self.config.entropy_coef
         self.score_threshold = self.config.score_threshold
-        self.std_deviation_factor = self.config.std_deviation_factor
         self.scores_window_size = self.config.scores_window_size
         self.max_timesteps_per_episode = self.config.max_timesteps_per_episode
         self.mode_save_frequency = self.config.model_save_frequency
