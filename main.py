@@ -7,16 +7,17 @@ from config import DQNConfig, PPOConfig
 
 
 def main(agent_type):
-    env = gym.make('LunarLander-v2')
+    env_id = 'LunarLander-v2'
+    env = gym.make(env_id)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    seed = 123
+    seed = 69420
 
     match agent_type:
         case 'dqn':
-            config = DQNConfig()
+            config = DQNConfig(env_id=env_id)
             agent = DQN(env, device, config, seed)
         case 'ppo':
-            config = PPOConfig()
+            config = PPOConfig(env_id=env_id)
             agent = PPO(env, device, config, seed)
 
     agent.train(1e7)

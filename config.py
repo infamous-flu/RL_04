@@ -8,6 +8,7 @@ class DQNConfig:
     Configuration class for DQN agent settings.
 
     Attributes:
+        env_id (str): Identifier for the environment used.
         learning_rate (float): Learning rate for the optimizer.
         buffer_size (int): Size of the memory buffer.
         learning_starts (int): How many steps before learning starts
@@ -28,6 +29,7 @@ class DQNConfig:
         log_dir (str): Directory for storing logs.
         save_path (str): Path to save the model.
     """
+    env_id: str
     learning_rate: float = 5e-4
     buffer_size: int = int(1e6)
     learning_starts: int = 100
@@ -45,17 +47,20 @@ class DQNConfig:
     print_every: int = 10000
     enable_logging: bool = True
     log_dir: str = \
-        field(default_factory=lambda: f'runs/dqn/{datetime.now().strftime("%Y%m%d%H%M%S")}')
+        field(default_factory=lambda self:
+              f'runs/{self.env_id}/dqn/{datetime.now().strftime("%Y%m%d%H%M%S")}', repr=False)
     save_path: str = \
-        field(default_factory=lambda: f'saved_models/dqn/model_{datetime.now().strftime("%Y%m%d%H%M%S")}.pth')
+        field(default_factory=lambda self:
+              f'saved_models/{self.env_id}/dqn/model_{datetime.now().strftime("%Y%m%d%H%M%S")}.pth', repr=False)
 
 
 @ dataclass
 class PPOConfig:
     """
-    Configuration class for DQN agent settings.
+    Configuration class for PPO agent settings.
 
     Attributes:
+        env_id (str): Identifier for the environment used.
         learning_rate (float): Learning rate for the optimizer.
         max_timesteps_per_batch (int): Maximum number of timesteps per batch.
         n_minibatches (int): Number of minibatches to split the batch into for training.
@@ -75,6 +80,7 @@ class PPOConfig:
         log_dir (str): Directory for storing logs.
         save_path (str): Path to save the model.
     """
+    env_id: str
     learning_rate: float = 5e-4
     max_timesteps_per_batch: int = 4000
     n_minibatches: int = 64
@@ -92,6 +98,8 @@ class PPOConfig:
     print_every: int = 10000
     enable_logging: bool = True
     log_dir: str = \
-        field(default_factory=lambda: f'runs/ppo/{datetime.now().strftime("%Y%m%d%H%M%S")}')
+        field(default_factory=lambda self:
+              f'runs/{self.env_id}/ppo/{datetime.now().strftime("%Y%m%d%H%M%S")}', repr=False)
     save_path: str = \
-        field(default_factory=lambda: f'saved_models/ppo/model_{datetime.now().strftime("%Y%m%d%H%M%S")}.pth')
+        field(default_factory=lambda self:
+              f'saved_models/{self.env_id}/ppo/model_{datetime.now().strftime("%Y%m%d%H%M%S")}.pth', repr=False)
