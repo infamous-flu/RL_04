@@ -319,7 +319,7 @@ class DQN:
 
         return lower_bound > self.score_threshold
 
-    def save_model(self, file_path, save_optimizer=False):
+    def save_model(self, file_path, save_optimizer=True):
         """
         Saves the policy network's model parameters to the specified file path.
         Optionally, it also saves the optimizer state.
@@ -335,7 +335,7 @@ class DQN:
             checkpoint['optimizer_state_dict'] = self.optimizer.state_dict()
         torch.save(checkpoint, file_path)
 
-    def load_model(self, file_path, load_optimizer=False):
+    def load_model(self, file_path, load_optimizer=True):
         """
         oads model parameters into the policy network and copies them to the target network.
         Optionally, it also loads the optimizer state.
