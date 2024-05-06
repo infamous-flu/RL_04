@@ -15,7 +15,6 @@ class DQNConfig:
         tau (float): Interpolation parameter for updating the target network.
         gamma (float): Discount factor for future rewards.
         learn_frequency (int): Number of steps between each learning.
-        target_update_interval (int): Number of steps between target network updates.
         epsilon (float): Initial value for the epsilon in the epsilon-greedy policy.
         eps_final (float): Final value of epsilon.
         eps_decay (float): Decay rate of epsilon per episode.
@@ -31,7 +30,7 @@ class DQNConfig:
 
     learning_rate: float = 5e-4
     buffer_size: int = int(1e6)
-    learning_starts: int = 100
+    learning_starts: int = 1000
     batch_size: int = 64
     tau: float = 1e-3
     gamma: float = 0.99
