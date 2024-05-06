@@ -29,6 +29,7 @@ class DQNConfig:
         log_dir (str): Directory for storing logs.
         save_path (str): Path to save the model.
     """
+
     env_id: str
     learning_rate: float = 5e-4
     buffer_size: int = int(1e6)
@@ -80,6 +81,7 @@ class PPOConfig:
         log_dir (str): Directory for storing logs.
         save_path (str): Path to save the model.
     """
+
     env_id: str
     learning_rate: float = 5e-4
     max_timesteps_per_batch: int = 4000
