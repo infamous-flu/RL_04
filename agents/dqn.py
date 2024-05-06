@@ -327,7 +327,7 @@ class DQN:
 
     def load_model(self, file_path: str, load_optimizer: bool = True):
         """
-        oads model parameters into the policy network and copies them to the target network.
+        Loads model parameters into the policy network and copies them to the target network.
         Optionally, it also loads the optimizer state.
 
         Args:
