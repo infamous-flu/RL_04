@@ -214,9 +214,9 @@ class PPO:
             self.scores_window.append(score)  # Record the score
 
             if self.enable_logging:
-                self.writer.add_scalar('Common/TotalScore', score, self.t)                          # Log the score
-                self.writer.add_scalar('Common/AverageScore', np.mean(self.scores_window), self.t)  # Log the average score
+                self.writer.add_scalar('Common/EpisodeReturn', score, self.t)                       # Log the score
                 self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)       # Log the episode length
+                self.writer.add_scalar('Common/AverageScore', np.mean(self.scores_window), self.t)  # Log the average score
 
             # Stop the rollout if environment is considered solved
             if self.is_environment_solved():
