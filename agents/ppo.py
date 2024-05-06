@@ -372,23 +372,6 @@ class PPO:
         log_probs = dist.log_prob(actions)             # Calculate the log probabilities of the actions
         return V.squeeze(), log_probs, dist.entropy()
 
-    def calculate_return(self, episode_rewards: List[float]) -> float:
-        """
-        Calculates the discounted return for an episode.
-
-        Args:
-            episode_rewards (List[float]): The rewards collected during the episode.
-
-        Returns:
-            float: The total discounted return for the episode.
-        """
-
-        episode_return = 0
-        # Calculate the return using the rewards obtained, applying discount factor gamma
-        for reward in reversed(episode_rewards):
-            episode_return = reward + self.gamma * episode_return
-        return episode_return
-
     def calculate_gae(self, rewards: List[List[float]], values: List[List[torch.Tensor]],
                       dones: List[List[bool]]) -> List[torch.Tensor]:
         """

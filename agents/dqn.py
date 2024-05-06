@@ -282,23 +282,6 @@ class DQN:
             action = self.env.action_space.sample()
         return action
 
-    def calculate_return(self, episode_rewards: List[float]) -> float:
-        """
-        Calculates the discounted return for an episode.
-
-        Args:
-            episode_rewards (List[float]): The rewards collected during the episode.
-
-        Returns:
-            float: The total discounted return for the episode.
-        """
-
-        episode_return = 0
-        # Calculate the return using the rewards obtained, applying discount factor gamma
-        for reward in reversed(episode_rewards):
-            episode_return = reward + self.gamma * episode_return
-        return episode_return
-
     def update_target_network(self):
         """
         Updates the target network by partially copying the weights from the policy network.
