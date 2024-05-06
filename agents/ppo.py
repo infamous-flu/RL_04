@@ -258,7 +258,7 @@ class PPO:
                            minibatch_size for i in range(self.n_minibatches)]
 
         cumulative_policy_loss, cumulative_value_loss, cumulative_entropy_loss = 0.0, 0.0, 0.0
-        for _ in range(self.n_epochs):                        # Loop over the number of specified epochs
+        for _ in range(self.n_epochs):                            # Loop over the number of specified epochs
             indices = torch.randperm(batch_size).to(self.device)  # Shuffle indices for minibatch creation
             start = 0
             for minibatch_size in minibatch_sizes:
@@ -386,20 +386,30 @@ class PPO:
             List[torch.Tensor]: The list of advantage estimates.
         """
 
-        advantages = []
+        advantages = []  # List to store the computed advantages for the batch
+
+        # Iterate through each episode's rewards, values, and done signals
         for episode_rewards, episode_values, episode_dones in zip(rewards, values, dones):
-            episode_advantages = []
-            last_advantage = 0
+            episode_advantages = []  # List to store the current episode's advantages
+            last_advantage = 0       # Initialize the last advantage to zero
+
+            # Process each timestep in reverse to compute the advantage values
             for i in reversed(range(len(episode_rewards))):
                 if i + 1 < len(episode_rewards):
+                    # Compute the temporal difference (delta) for the current step
                     delta = episode_rewards[i] + self.gamma * \
                         episode_values[i+1] * (1 - episode_dones[i+1]) - episode_values[i]
                 else:
+                    # Compute the difference between the reward and current value for the last step
                     delta = episode_rewards[i] - episode_values[i]
+
+                # Compute the advantage value using the GAE formula
                 advantage = delta + self.gamma * self.gae_lambda * (1 - episode_dones[i]) * last_advantage
-                last_advantage = advantage
-                episode_advantages.insert(0, advantage)
-            advantages.extend(episode_advantages)
+                last_advantage = advantage               # Update the last advantage for the next timestep
+                episode_advantages.insert(0, advantage)  # Insert at the front of the list
+
+            advantages.extend(episode_advantages)  # Extend the main advantages with the current episode's
+
         return advantages
 
     def is_environment_solved(self):
