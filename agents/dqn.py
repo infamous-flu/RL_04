@@ -4,13 +4,11 @@ from collections import deque, namedtuple
 
 import numpy as np
 from numpy.typing import NDArray
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-
 import gymnasium as gym
 
 
@@ -33,6 +31,7 @@ class ReplayMemory:
         Args:
             capacity (int): The maximum number of experiences to store.
         """
+
         self.memory = deque([], maxlen=capacity)
 
     def push(self, *args: Tuple):
@@ -43,6 +42,7 @@ class ReplayMemory:
         Args:
             *args (Tuple): A tuple representing an experience.
         """
+
         self.memory.append(Experience(*args))
 
     def sample(self, batch_size: int) -> List[Experience]:
@@ -55,6 +55,7 @@ class ReplayMemory:
         Returns:
             List[Experience]: A list of randomly sampled experiences.
         """
+
         return random.sample(self.memory, batch_size)
 
     def __len__(self) -> int:
@@ -64,6 +65,7 @@ class ReplayMemory:
         Returns:
             int: The number of experiences stored in the memory.
         """
+
         return len(self.memory)
 
 
@@ -85,6 +87,7 @@ class QNetwork(nn.Module):
             n_observations (int): Number of observation inputs expected by the network.
             n_actions (int): Number of possible actions the agent can take.
         """
+
         super(QNetwork, self).__init__()
         self.fc1 = nn.Linear(n_observations, 128)  # First fully connected layer
         self.fc2 = nn.Linear(128, 128)             # Second fully connected layer
@@ -100,6 +103,7 @@ class QNetwork(nn.Module):
         Returns:
             torch.Tensor: The tensor containing Q-values for each action.
         """
+
         x = F.relu(self.fc1(x))  # Activation function after the first layer
         x = F.relu(self.fc2(x))  # Activation function after the second layer
         return self.fc3(x)       # Output from the final layer
@@ -126,6 +130,7 @@ class DQN:
             config (DQNConfig): A dataclass containing all necessary hyperparameters.
             seed (int): Seed for the pseudo random generators.
         """
+
         self.env = env                                        # The gym environment where the agent will interact
         self.device = device                                  # The computation device (CPU or GPU)
         self.config = config                                  # Configuration containing all hyperparameters
@@ -146,6 +151,7 @@ class DQN:
         Args:
             n_timesteps (int): The number of timesteps to train the agent.
         """
+
         self.t = 0                                                      # Initialize global timestep counter
         self.episode_i = 0                                              # Initialize episode counter
         self.scores_window = deque([], maxlen=self.scores_window_size)  # Used for tracking the average score
@@ -171,10 +177,8 @@ class DQN:
         """
         Executes one episode of interaction with the environment, collecting experience
         and training the Q network.
-
-        Returns:
-            None
         """
+
         score = 0                          # Initialize score for the episode
         observation, _ = self.env.reset()  # Reset the environment and get the initial observation
 
@@ -214,6 +218,7 @@ class DQN:
         """
         Performs a learning update using the Deep Q-Learning (DQN) algorithm.
         """
+
         # Check if enough samples are available in memory
         if len(self.memory) < self.batch_size:
             return
@@ -262,6 +267,7 @@ class DQN:
         Returns:
             int: The action selected by the agent.
         """
+
         # Decide whether to select the best action based on model prediction or sample randomly
         if np.random.random() > self.epsilon or deterministic:
             # Convert the observation to a tensor and add a batch dimension (batch size = 1)
@@ -286,6 +292,7 @@ class DQN:
         Returns:
             float: The total discounted return for the episode.
         """
+
         episode_return = 0
         # Calculate the return using the rewards obtained, applying discount factor gamma
         for reward in reversed(episode_rewards):
@@ -296,6 +303,7 @@ class DQN:
         """
         Updates the target network by partially copying the weights from the policy network.
         """
+
         for policy_param, target_param in zip(self.policy_net.parameters(), self.target_net.parameters()):
             target_param.data.copy_(self.tau * policy_param.data + (1 - self.tau) * target_param.data)
 
@@ -306,6 +314,7 @@ class DQN:
         Returns:
             bool: True if the environment is solved, False otherwise.
         """
+
         if len(self.scores_window) < self.scores_window_size:
             return False  # Not enough scores for a valid evaluation
 
@@ -325,6 +334,7 @@ class DQN:
             file_path (str): The path to the file where the model parameters are to be saved.
             save_optimizer (bool): If True, saves the optimizer state as well. Defaults to False.
         """
+
         checkpoint = {
             'model_state_dict': self.policy_net.state_dict()
         }
@@ -341,6 +351,7 @@ class DQN:
             file_path (str): The path to the file from which to load the model parameters.
             load_optimizer (bool): If True, loads the optimizer state as well. Defaults to False.
         """
+
         checkpoint = torch.load(file_path)
         self.policy_net.load_state_dict(checkpoint['model_state_dict'])
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -362,6 +373,7 @@ class DQN:
         Returns:
             Tuple of Tensors: Prepared tensors of observations, actions, next_observations, rewards, and dones.
         """
+
         observations = torch.tensor(np.stack(observations), dtype=torch.float32).to(self.device)
         actions = torch.tensor(np.stack(actions), dtype=torch.int64).to(self.device)
         next_observations = torch.tensor(np.stack(next_observations), dtype=torch.float32).to(self.device)
@@ -376,6 +388,7 @@ class DQN:
         Args:
             seed (int): The seed value to be used.
         """
+
         # Seed the Gym environment
         self.env.reset(seed=seed)
         self.env.action_space.seed(seed)
@@ -393,6 +406,7 @@ class DQN:
         """
         Initializes hyperparameters from the configuration.
         """
+
         self.learning_rate = self.config.learning_rate
         self.buffer_size = self.config.buffer_size
         self.learning_starts = self.config.learning_starts
@@ -416,6 +430,7 @@ class DQN:
         """
         Initializes the policy and target neural networks and sets up the optimizer and loss function.
         """
+
         self.policy_net = QNetwork(self.n_observations, self.n_actions).to(self.device)
         self.target_net = QNetwork(self.n_observations, self.n_actions).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -427,6 +442,7 @@ class DQN:
         """
         Initializes Tensorboard writer for logging if logging is enabled.
         """
+
         if self.enable_logging:
             self.writer = SummaryWriter(self.log_dir)
         else:

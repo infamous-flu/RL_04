@@ -3,14 +3,12 @@ from collections import deque
 
 import numpy as np
 from numpy.typing import NDArray
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions.categorical import Categorical
 from torch.utils.tensorboard import SummaryWriter
-
 import gymnasium as gym
 
 
@@ -32,6 +30,7 @@ class BaseNetwork(nn.Module):
             input_dims (int): Dimensionality of the input features.
             output_dims (int): Dimensionality of the output layer.
         """
+
         super(BaseNetwork, self).__init__()
         self.fc1 = nn.Linear(input_dims, 128)   # First fully connected layer
         self.fc2 = nn.Linear(128, 128)          # Second fully connected layer
@@ -47,6 +46,7 @@ class BaseNetwork(nn.Module):
         Returns:
             torch.Tensor: The output of the network.
         """
+
         x = F.relu(self.fc1(x))  # Activation function after the first layer
         x = F.relu(self.fc2(x))  # Activation function after the second layer
         return self.fc3(x)       # Output from the final layer
@@ -69,6 +69,7 @@ class ActorCriticNetwork(nn.Module):
             n_observations (int): Number of observation inputs expected by the network.
             n_actions (int): Number of possible actions the agent can take.
         """
+
         super(ActorCriticNetwork, self).__init__()
         self.actor = BaseNetwork(n_observations, n_actions)  # Actor network initialization
         self.critic = BaseNetwork(n_observations, 1)         # Critic network initialization
@@ -83,6 +84,7 @@ class ActorCriticNetwork(nn.Module):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Contains the output from the actor and the critic networks.
         """
+
         return self.actor(x), self.critic(x)  # Return actor and critic network outputs
 
 
@@ -107,6 +109,7 @@ class PPO:
             config (PPOConfig): A dataclass containing all necessary hyperparameters.
             seed (int): Seed for the pseudo random generators.
         """
+
         self.env = env                                        # The gym environment where the agent will interact
         self.device = device                                  # The computation device (CPU or GPU)
         self.config = config                                  # Configuration containing all hyperparameters
@@ -126,6 +129,7 @@ class PPO:
         Args:
             n_timesteps (int): The number of timesteps to train the agent.
         """
+
         self.t = 0                                                      # Initialize global timestep counter
         self.batch_i = 0                                                # Initialize batch counter
         self.episode_i = 0                                              # Initialize episode counter
@@ -168,6 +172,7 @@ class PPO:
             - values (List[List[torch.Tensor]]): Estimated values after taking actions.
             - dones (List[List[bool]]): Boolean flags indicating if an episode has ended.
         """
+
         batch_t = 0  # Initialize batch timestep counter
         observations, actions, log_probs, rewards, values, dones = [], [], [], [], [], []
 
@@ -232,6 +237,7 @@ class PPO:
             values (List[List[torch.Tensor]]): Lists of estimated values after taking actions.
             dones (List[List[bool]]): Lists of boolean flags indicating if an episode has ended.
         """
+
         # Calculate the advantage estimates using Generalized Advantage Estimation (GAE)
         advantages = self.calculate_gae(rewards, values, dones)
 
@@ -327,6 +333,7 @@ class PPO:
                 - torch.Tensor: The log probability of the selected action.
                 - torch.Tensor: The value estimate from the critic network.
         """
+
         # Convert the observation to a tensor and add a batch dimension (batch size = 1)
         observation = torch.tensor(observation, dtype=torch.float32).unsqueeze(0).to(self.device)
         # Model prediction: Get logits and state value estimate
@@ -359,6 +366,7 @@ class PPO:
                 torch.Tensor: The log probabilities of the taken actions.
                 torch.Tensor: The entropy of the policy distribution.
         """
+
         logits, V = self.actor_critic(observations)    # Forward pass through the actor-critic network
         dist = Categorical(logits=logits)              # Create a categorical distribution based on the logits
         log_probs = dist.log_prob(actions)             # Calculate the log probabilities of the actions
@@ -374,6 +382,7 @@ class PPO:
         Returns:
             float: The total discounted return for the episode.
         """
+
         episode_return = 0
         # Calculate the return using the rewards obtained, applying discount factor gamma
         for reward in reversed(episode_rewards):
@@ -393,6 +402,7 @@ class PPO:
         Returns:
             List[torch.Tensor]: The list of advantage estimates.
         """
+
         advantages = []
         for episode_rewards, episode_values, episode_dones in zip(rewards, values, dones):
             episode_advantages = []
@@ -416,6 +426,7 @@ class PPO:
         Returns:
             bool: True if the environment is solved, False otherwise.
         """
+
         if len(self.scores_window) < self.scores_window_size:
             return False  # Not enough scores for a valid evaluation
 
@@ -435,6 +446,7 @@ class PPO:
             file_path (str): The path to the file where the model parameters are to be saved.
             save_optimizer (bool): If True, saves the optimizer state as well. Defaults to False.
         """
+
         checkpoint = {
             'model_state_dict': self.actor_critic.state_dict()
         }
@@ -450,6 +462,7 @@ class PPO:
             file_path (str): The path to the file from which to load the model parameters.
             load_optimizer (bool): If True, loads the optimizer state as well. Defaults to False.
         """
+
         checkpoint = torch.load(file_path)
         self.actor_critic.load_state_dict(checkpoint['model_state_dict'])
         if load_optimizer and 'optimizer_state_dict' in checkpoint:
@@ -471,6 +484,7 @@ class PPO:
         Returns:
             Tuple of Tensors: Prepared tensors of observations, actions, log_probs, and advantages.
         """
+
         observations = torch.tensor(np.stack(observations), dtype=torch.float32).to(self.device)
         actions = torch.tensor(np.stack(actions), dtype=torch.int64).to(self.device)
         log_probs = torch.tensor(log_probs, dtype=torch.float32).to(self.device)
@@ -484,6 +498,7 @@ class PPO:
         Args:
             seed (int): The seed value to be used.
         """
+
         # Seed the Gym environment
         self.env.reset(seed=seed)
         self.env.action_space.seed(seed)
@@ -499,6 +514,7 @@ class PPO:
         """
         Initializes hyperparameters from the configuration.
         """
+
         self.learning_rate = self.config.learning_rate
         self.max_timesteps_per_batch = self.config.max_timesteps_per_batch
         self.n_minibatches = self.config.n_minibatches
@@ -522,6 +538,7 @@ class PPO:
         """
         Initializes the actor-critic neural network and sets up the optimizer and loss function.
         """
+
         self.actor_critic = ActorCriticNetwork(self.n_observations, self.n_actions).to(self.device)
         self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=self.learning_rate)
         self.MSELoss = nn.MSELoss()
@@ -530,6 +547,7 @@ class PPO:
         """
         Initializes Tensorboard writer for logging if logging is enabled.
         """
+
         if self.enable_logging:
             self.writer = SummaryWriter(self.log_dir)
         else:
