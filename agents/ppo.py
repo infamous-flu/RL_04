@@ -66,8 +66,8 @@ class ActorCriticNetwork(nn.Module):
         Initializes the ActorCriticNetwork with specified dimensions for input and output layers.
 
         Args:
-            n_observations(int): Number of observation inputs expected by the network.
-            n_actions(int): Number of possible actions the agent can take.
+            n_observations (int): Number of observation inputs expected by the network.
+            n_actions (int): Number of possible actions the agent can take.
         """
         super(ActorCriticNetwork, self).__init__()
         self.actor = BaseNetwork(n_observations, n_actions)  # Actor network initialization
@@ -154,19 +154,19 @@ class PPO:
             self.writer.close()
 
     def rollout(self) -> Tuple[List[np.ndarray], List[int], List[torch.Tensor],
-                               List[float], List[torch.Tensor], List[bool]]:
+                               List[List[float]], List[List[torch.Tensor]], List[List[bool]]]:
         """
         Executes one rollout to collect training data until a batch of trajectories is filled
-        or average score meets the threshold.
+        or the environment is considered solved.
 
         Returns:
-            A tuple containing lists of:
-            - observations (np.ndarray): The environment's states observed by the agent.
-            - actions (int): Actions taken by the agent.
-            - log probabilities (torch.Tensor): Log probabilities of the actions taken.
-            - rewards (float): Rewards received after taking actions.
-            - values (torch.Tensor): Estimated value functions from the critic network.
-            - dones (bool): Boolean flags indicating if an episode has ended.
+            A tuple containing:
+            - observations (List[np.ndarray]): The environment's states observed by the agent.
+            - actions (List[int]): Actions taken by the agent.
+            - log probabilities (List[torch.Tensor]): Log probabilities of the actions taken.
+            - rewards (List[List[float]]): Rewards received after taking actions.
+            - values (List[List[torch.Tensor]]): Estimated values after taking actions.
+            - dones (List[List[bool]]): Boolean flags indicating if an episode has ended.
         """
         batch_t = 0  # Initialize batch timestep counter
         observations, actions, log_probs, rewards, values, dones = [], [], [], [], [], []
@@ -219,7 +219,8 @@ class PPO:
 
         return observations, actions, log_probs, rewards, values, dones
 
-    def learn(self, observations, actions, log_probs, rewards, values, dones):
+    def learn(self, observations: List[np.ndarray], actions: List[int], log_probs: List[torch.Tensor],
+              rewards: List[List[float]], values: List[List[torch.Tensor]], dones: List[List[bool]]):
         """
         Performs a learning update using the Proximal Policy Optimization (PPO) algorithm.
 
@@ -227,9 +228,9 @@ class PPO:
             observations (List[np.ndarray]): The environment's states observed by the agent.
             actions (List[int]): Actions taken by the agent.
             log probabilities (List[torch.Tensor]): Log probabilities of the actions taken.
-            rewards (List[List[float]]): Rewards received after taking actions.
-            values (List[List[torch.Tensor]]): Estimated value functions from the critic network.
-            dones (List[List[bool]]): Boolean flags indicating if an episode has ended.
+            rewards (List[List[float]]): Lists of rewards received after taking actions.
+            values (List[List[torch.Tensor]]): Lists of estimated values after taking actions.
+            dones (List[List[bool]]): Lists of boolean flags indicating if an episode has ended.
         """
         # Calculate the advantage estimates using Generalized Advantage Estimation (GAE)
         advantages = self.calculate_gae(rewards, values, dones)
@@ -310,7 +311,7 @@ class PPO:
             self.writer.add_scalar('PPO/ValueLoss', mean_value_loss, self.t)      # Log the value loss
             self.writer.add_scalar('PPO/EntropyLoss', mean_entropy_loss, self.t)  # Log the entropy loss
 
-    def select_action(self, observation: NDArray[np.float32], deterministic=False):
+    def select_action(self, observation: NDArray[np.float32], deterministic: bool = False):
         """
         Selects an action based on the current observation using the policy defined by the actor-critic network.
 
@@ -342,7 +343,8 @@ class PPO:
             log_prob = dist.log_prob(action)
             return action.item(), log_prob, V.squeeze()
 
-    def evaluate(self, observations, actions):
+    def evaluate(self, observations: torch.Tensor, actions: torch.Tensor) \
+            -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Evaluates the given observations and actions using the actor-critic network
         to obtain log probabilities, values, and entropy.
@@ -352,9 +354,10 @@ class PPO:
             actions (torch.Tensor): The batch of actions taken.
 
         Returns:
-            torch.Tensor: The value estimates for the given observations.
-            torch.Tensor: The log probabilities of the taken actions.
-            torch.Tensor: The entropy of the policy distribution.
+            A tuple containing:
+                torch.Tensor: The value estimates for the given observations.
+                torch.Tensor: The log probabilities of the taken actions.
+                torch.Tensor: The entropy of the policy distribution.
         """
         logits, V = self.actor_critic(observations)    # Forward pass through the actor-critic network
         dist = Categorical(logits=logits)              # Create a categorical distribution based on the logits
@@ -366,7 +369,7 @@ class PPO:
         Calculates the discounted return for an episode.
 
         Args:
-            episode_rewards (list of float): The rewards collected during the episode.
+            episode_rewards (List[float]): The rewards collected during the episode.
 
         Returns:
             float: The total discounted return for the episode.
@@ -377,17 +380,18 @@ class PPO:
             episode_return = reward + self.gamma * episode_return
         return episode_return
 
-    def calculate_gae(self, rewards, values, dones) -> List[float]:
+    def calculate_gae(self, rewards: List[List[float]], values: List[List[torch.Tensor]],
+                      dones: List[List[bool]]) -> List[torch.Tensor]:
         """
         Calculates the Generalized Advantage Estimation (GAE) for a set of rewards, values, and done signals.
 
         Args:
             rewards (List[List[float]]): Rewards obtained from the environment.
-            values (List[List[float]]): Value estimates from the critic.
+            values (List[List[torch.Tensor]]): Value estimates from the critic.
             dones (List[List[bool]]): Done signals indicating the end of an episode.
 
         Returns:
-            List[float]: The list of advantage estimates.
+            List[torch.Tensor]: The list of advantage estimates.
         """
         advantages = []
         for episode_rewards, episode_values, episode_dones in zip(rewards, values, dones):
@@ -422,7 +426,7 @@ class PPO:
 
         return lower_bound > self.score_threshold
 
-    def save_model(self, file_path, save_optimizer=True):
+    def save_model(self, file_path: str, save_optimizer: bool = True):
         """
         Saves the actor-critic network's model parameters to the specified file path.
         Optionally, it also saves the optimizer state.
@@ -438,7 +442,7 @@ class PPO:
             checkpoint['optimizer_state_dict'] = self.optimizer.state_dict()
         torch.save(checkpoint, file_path)
 
-    def load_model(self, file_path, load_optimizer=True):
+    def load_model(self, file_path: str, load_optimizer: bool = True):
         """
         Loads model parameters into the actor-critic network, and optionally loads the optimizer state.
 
@@ -451,7 +455,9 @@ class PPO:
         if load_optimizer and 'optimizer_state_dict' in checkpoint:
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-    def _prepare_tensors(self, observations, actions, log_probs, advantages):
+    def _prepare_tensors(self, observations: List[np.ndarray], actions: List[int],
+                         log_probs: List[torch.Tensor], advantages: List[torch.Tensor]) -> \
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Converts lists of observations, actions, log probs, and advantages into tensors
         and sends them to the specified device.

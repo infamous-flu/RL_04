@@ -250,7 +250,7 @@ class DQN:
         if self.enable_logging:
             self.writer.add_scalar('DQN/Loss', loss, self.t)  # Log the loss
 
-    def select_action(self, observation: NDArray[np.float32], deterministic=False) -> int:
+    def select_action(self, observation: NDArray[np.float32], deterministic: bool = False) -> int:
         """
         Selects an action based on the current observation using an epsilon-greedy policy.
 
@@ -281,7 +281,7 @@ class DQN:
         Calculates the discounted return for an episode.
 
         Args:
-            episode_rewards (list of float): The rewards collected during the episode.
+            episode_rewards (List[float]): The rewards collected during the episode.
 
         Returns:
             float: The total discounted return for the episode.
@@ -295,7 +295,6 @@ class DQN:
     def update_target_network(self):
         """
         Updates the target network by partially copying the weights from the policy network.
-        This helps stabilize the learning process.
         """
         for policy_param, target_param in zip(self.policy_net.parameters(), self.target_net.parameters()):
             target_param.data.copy_(self.tau * policy_param.data + (1 - self.tau) * target_param.data)
@@ -317,7 +316,7 @@ class DQN:
 
         return lower_bound > self.score_threshold
 
-    def save_model(self, file_path, save_optimizer=True):
+    def save_model(self, file_path: str, save_optimizer: bool = True):
         """
         Saves the policy network's model parameters to the specified file path.
         Optionally, it also saves the optimizer state.
@@ -333,7 +332,7 @@ class DQN:
             checkpoint['optimizer_state_dict'] = self.optimizer.state_dict()
         torch.save(checkpoint, file_path)
 
-    def load_model(self, file_path, load_optimizer=True):
+    def load_model(self, file_path: str, load_optimizer: bool = True):
         """
         oads model parameters into the policy network and copies them to the target network.
         Optionally, it also loads the optimizer state.
@@ -350,7 +349,8 @@ class DQN:
 
     def _prepare_tensors(self, observations, actions, next_observations, rewards, dones):
         """
-        Converts lists of numpy arrays into tensors and sends them to the specified device.
+        Converts lists of observations, actions, next_observations, rewards, and dones
+        into tensors and sends them to the specified device.
 
         Args:
             observations: List of observations from the environment.
