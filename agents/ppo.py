@@ -1,5 +1,6 @@
-from typing import List, Tuple
+import random
 from collections import deque
+from typing import List, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -496,6 +497,8 @@ class PPO:
         self.env.reset(seed=seed)
         self.env.action_space.seed(seed)
         self.env.observation_space.seed(seed)
+        # Seed Python's random module
+        random.seed(seed)
         # Seed NumPy's random generator
         np.random.seed(seed)
         # Seed PyTorch for reproducibility in computations
