@@ -1,7 +1,8 @@
+import os
 import re
 from datetime import datetime
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 
 @dataclass
@@ -21,10 +22,12 @@ class TrainingConfig:
         score_threshold (int): Defines when the environment is considered solved.
         scores_window_size (int): Window size for calculating rolling average scores.
         max_timesteps_per_episode (int): Maximum timesteps per episode.
-        print_every (int): How often to print scores.
+        print_every (int): How often to print scores. Negative values disable printing.
         enable_logging (bool): Whether logging is enabled or not.
         log_dir (str): Directory for storing Tensorboard logs.
-        checkpoint_frequency (int): How frequently to save models.
+        checkpoint_frequency (int): How frequently to save models. A value of `0` will
+        automatically select the frequency based on the agent type. Positive values define
+        a custom interval, and negative values disable model saving.
         save_path (str): Path to save the model.
     """
 
@@ -42,17 +45,53 @@ class TrainingConfig:
     print_every: int = 10000
     enable_logging: bool = True
     log_dir: Optional[str] = None
-    checkpoint_frequency: int = 20
+    checkpoint_frequency: int = 0
     save_path: Optional[str] = None
 
     def __post_init__(self):
+        # Validate agent type
+        if self.agent_type not in ['dqn', 'ppo']:
+            raise ValueError(f'Unsupported agent type: {self.agent_type}.')
+
+        # Validate numeric ranges for certain attributes
+        if self.n_timesteps <= 0:
+            raise ValueError('n_timesteps must be positive.')
+        if self.record_every <= 0:
+            raise ValueError('record_every must be positive.')
+        if self.max_timesteps_per_episode <= 0:
+            raise ValueError('max_timesteps_per_episode must be positive.')
+        if self.score_threshold < 0:
+            raise ValueError('score_threshold cannot be negative.')
+
+        # Automatically select checkpoint frequency
+        if self.checkpoint_frequency == 0:
+            match self.agent_type:
+                case 'dqn':
+                    self.checkpoint_frequency = 100
+                case 'ppo':
+                    self.checkpoint_frequency = 10
+
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+
+        # Ensure video folder is set up correctly
         if self.video_folder is None:
-            self.video_folder = f'recordings/{self.env_id}/{self.agent_type}/{timestamp}/training'
+            self.video_folder = os.path.join('recordings', self.env_id, self.agent_type, timestamp, 'training')
+
+        # Ensure logging directory is set up correctly
         if self.log_dir is None:
-            self.log_dir = f'runs/{self.env_id}/{self.agent_type}/{timestamp}'
+            self.log_dir = os.path.join('runs', self.env_id, self.agent_type, timestamp)
+
+        # Ensure save path is properly defined
         if self.save_path is None:
-            self.save_path = f'saved_models/{self.env_id}/{self.agent_type}/model_{timestamp}.pth'
+            self.save_path = os.path.join('saved_models', self.env_id, self.agent_type, f'model_{timestamp}.pth')
+
+        # Create the directory for saving models if it doesn't exist
+        save_dir = os.path.dirname(self.save_path)
+        if not os.path.exists(save_dir):
+            try:
+                os.makedirs(save_dir, exist_ok=True)
+            except OSError as e:
+                raise OSError(f"Failed to create directory {save_dir}: {e}")
 
 
 @dataclass
@@ -80,7 +119,7 @@ class EvaluationConfig:
     deterministic: bool = True
     model_path: Optional[str] = None
     enable_recording: bool = False
-    record_every: int = 1
+    record_every: int = 2
     video_folder: Optional[str] = None
     name_prefix: str = field(default='')
 
@@ -101,4 +140,4 @@ class EvaluationConfig:
                 timestamp_match = re.search(r'(\d{8}\d{6})', self.agent.save_path)
             timestamp = timestamp_match.group(1) if timestamp_match \
                 else datetime.now().strftime('%Y%m%d%H%M%S')
-            self.video_folder = f'recordings/{self.env_id}/{agent_type}/{timestamp}/evaluation'
+            self.video_folder = os.path.join('recordings', self.env_id, agent_type, timestamp, 'evaluation')

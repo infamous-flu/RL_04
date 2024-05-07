@@ -150,18 +150,20 @@ class PPO:
                 str1 = str1.center(60)
                 str2 = f'Average Return: {np.mean(self.scores_window):.3f} | Number of Episodes: {self.episode_i}'
                 str2 = str2.center(60)
-                print(f'\n{str1}\n{str2}')
+                if self.print_every > 0:
+                    print(f'\n{str1}\n{str2}')
                 break
 
             # Learn using the collected batch of trajectories
             self.learn(observations, actions, log_probs, rewards, values, dones)
 
             # Save the model at specified intervals
-            if self.batch_i % self.checkpoint_frequency == 0:
+            if self.checkpoint_frequency > 0 and self.batch_i % self.checkpoint_frequency == 0:
                 self.save_model(self.save_path)
 
         # Final save and close the logger
-        self.save_model(self.save_path)
+        if self.checkpoint_frequency > 0:
+            self.save_model(self.save_path)
         if self.writer is not None:
             self.writer.close()
 
@@ -206,7 +208,7 @@ class PPO:
                 episode_values.append(V)
 
                 # Print progress periodically
-                if self.t % self.print_every == 0:
+                if self.print_every > 0 and self.t % self.print_every == 0:
                     print(f'     Timestep {self.t:>7}     \tAverage Return: {np.mean(self.scores_window):.3f}')
 
                 if done:

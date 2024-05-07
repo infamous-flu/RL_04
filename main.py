@@ -25,10 +25,9 @@ def evaluate(config: EvaluationConfig) -> float:
     random.seed(config.seed)
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
-    gym.utils.seeding.seed(config.seed)
 
     # Create the evaluation environment
-    env = gym.make(config.env_id, render_mode='human')
+    env = gym.make(config.env_id, render_mode='rgb_array')
 
     # Enable video recording if specified
     if config.enable_recording:
@@ -78,7 +77,6 @@ def train(agent_config: Union[DQNConfig, PPOConfig], config: TrainingConfig) -> 
     random.seed(config.seed)
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
-    gym.utils.seeding.seed(config.seed)
 
     # Set the device for training
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -122,7 +120,7 @@ def train(agent_config: Union[DQNConfig, PPOConfig], config: TrainingConfig) -> 
 def main():
     # Set up the training configuration
     env_id = 'LunarLander-v2'      # The ID of the gym environment to be used
-    agent_type = 'ppo'             # The type of agent to be trained
+    agent_type = 'ddpg'             # The type of agent to be trained
     training_seed = 69420          # Seed for training reproducibility
     training_timesteps = int(1e7)  # Number of timesteps for training
 
@@ -164,7 +162,7 @@ def main():
 
     evaluation_config = EvaluationConfig(
         env_id=env_id,
-        agent=trained_agent,
+        agent='ppo',
         n_episodes=evaluation_episodes,
         seed=evaluation_seed,
         enable_recording=True
