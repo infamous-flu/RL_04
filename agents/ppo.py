@@ -215,9 +215,9 @@ class PPO:
             self.scores_window.append(score)  # Record the score
 
             if self.enable_logging:
-                self.writer.add_scalar('Common/EpisodeReturn', score, self.t)                       # Log the score
-                self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)       # Log the episode length
-                self.writer.add_scalar('Common/AverageScore', np.mean(self.scores_window), self.t)  # Log the average score
+                self.writer.add_scalar('Common/AverageReturn', np.mean(self.scores_window), self.t)  # Log the average score
+                self.writer.add_scalar('Common/EpisodeReturn', score, self.t)                        # Log the score
+                self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)        # Log the episode length
 
             # Stop the rollout if environment is considered solved
             if self.is_environment_solved():
@@ -486,22 +486,16 @@ class PPO:
         return observations, actions, log_probs, advantages
 
     def _set_seed(self, seed: int):
-        """
-        Sets the seed for reproducibility in various components.
+        """Set seeds for reproducibility in various components."""
 
-        Args:
-            seed (int): The seed value to be used.
-        """
-
-        # Seed the Gym environment
+        # Seed the environment
         self.env.reset(seed=seed)
         self.env.action_space.seed(seed)
         self.env.observation_space.seed(seed)
-        # Seed Python's random module
+
+        # Seed Python, NumPy, and PyTorch
         random.seed(seed)
-        # Seed NumPy's random generator
         np.random.seed(seed)
-        # Seed PyTorch for reproducibility in computations
         torch.manual_seed(seed)
         if self.device.type == 'cuda':
             torch.cuda.manual_seed_all(seed)
