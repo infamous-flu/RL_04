@@ -3,9 +3,6 @@ from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from agents.dqn import DQN
-from agents.ppo import PPO
-
 
 @dataclass
 class TrainingConfig:
@@ -88,6 +85,9 @@ class EvaluationConfig:
     name_prefix: str = field(default='')
 
     def __post_init__(self):
+        from agents.dqn import DQN
+        from agents.ppo import PPO
+
         if isinstance(self.agent, DQN):
             agent_type = 'dqn'
         elif isinstance(self.agent, PPO):

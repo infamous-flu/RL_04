@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Tuple
 
 
-def nice_box(width: int, contents: Optional[List[Tuple[str, str]]] = None, margin: int = 2,
+def nice_box(width: int, contents: Optional[List[Tuple[str, Optional[str]]]] = None, margin: int = 2,
              thick: bool = False, upper: bool = True, lower: bool = True, sides: bool = True) -> str:
     """
     Creates a nice decorative text box with the following options:
@@ -38,7 +38,7 @@ def nice_box(width: int, contents: Optional[List[Tuple[str, str]]] = None, margi
               'BL': '└', 'BR': '┘'}
 
     # Calculate inner width for content display area
-    inner_width: int = width-margin*2
+    inner_width: int = width - margin * 2
 
     box_str: str = ''
 
@@ -52,23 +52,19 @@ def nice_box(width: int, contents: Optional[List[Tuple[str, str]]] = None, margi
                 not isinstance(content[0], str) or not isinstance(content[1], str):
             raise ValueError(
                 'Contents must be a list of tuples with (string, alignment) format.')
-        text: str = content[0]
-        alignment: str = content[1]
+        text, alignment = content
 
         # Truncate content if it's longer than the inner width
         text = text[:inner_width-3] + \
             '...' if len(text) > (inner_width) else text
 
-        # Calculate spaces for centering
-        spaces = inner_width - len(text)
-        halfsp = spaces // 2
         match alignment:
             case 'c':
-                text = ' ' * halfsp + text + ' ' * (spaces - halfsp)
+                text = text.center(inner_width)
             case 'r':
-                text = ' ' * spaces + text
+                text = text.rjust(inner_width)
             case _:
-                text = text + ' ' * spaces
+                text = text.ljust(inner_width)
 
         # Build the content string with margins and vertical bar
         box_str += '\n' + (box_char['V'] if sides else ' ') + ' ' * \

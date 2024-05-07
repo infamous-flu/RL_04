@@ -1,6 +1,6 @@
 import time
 import random
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 import numpy as np
 import torch
@@ -11,6 +11,7 @@ from agents.dqn import DQN
 from agents.ppo import PPO
 from config.agents_config import DQNConfig, PPOConfig
 from config.experiment_config import TrainingConfig, EvaluationConfig
+from utils.helpers import nice_box
 
 
 def evaluate(config: EvaluationConfig) -> float:
@@ -55,18 +56,18 @@ def evaluate(config: EvaluationConfig) -> float:
             observation, reward, terminated, truncated, _ = env.step(action)
             episode_return += reward
             done = terminated or truncated
-        print(f'Episode {episode}\tReturn: {episode_return:.3f}')
         returns.append(episode_return)
         observation, _ = env.reset()
 
     # Compute the average return across all episodes
     average_return = sum(returns) / config.n_episodes
-    print(f'\nAverage return over {config.n_episodes} episodes: {average_return:.3f}')
+    res_str = f'Average return over {config.n_episodes} episodes: {average_return:.3f}'
+    print(res_str.center(60))
 
     return average_return
 
 
-def train(config: TrainingConfig, agent_config: Optional[Union[DQNConfig, PPOConfig]] = None) -> Any:
+def train(agent_config: Union[DQNConfig, PPOConfig], config: TrainingConfig) -> Any:
     """Train a RL agent based on the provided configuration."""
 
     # Generate seed if it's not specified
@@ -98,12 +99,12 @@ def train(config: TrainingConfig, agent_config: Optional[Union[DQNConfig, PPOCon
     # Initialize the agent based on the agent type
     match config.agent_type:
         case 'dqn':
-            if agent_config is None:
-                agent_config = DQNConfig()
+            if not isinstance(agent_config, DQNConfig):
+                raise TypeError('placeholder text')
             agent = DQN(env, device, agent_config, config)
         case 'ppo':
-            if agent_config is None:
-                agent_config = PPOConfig()
+            if not isinstance(agent_config, PPOConfig):
+                raise TypeError('placeholder text')
             agent = PPO(env, device, agent_config, config)
         case _:
             raise ValueError(f'Unknown agent type: {config.agent_type}')
@@ -125,6 +126,14 @@ def main():
     training_seed = 69420          # Seed for training reproducibility
     training_timesteps = int(1e7)  # Number of timesteps for training
 
+    box_width = 60
+
+    match agent_type:
+        case 'dqn':
+            agent_config = DQNConfig()
+        case 'ppo':
+            agent_config = PPOConfig()
+
     training_config = TrainingConfig(
         env_id=env_id,
         agent_type=agent_type,
@@ -133,8 +142,21 @@ def main():
         enable_recording=True
     )
 
+    print('\n' + nice_box(
+        width=box_width,
+        contents=[(f'Deep Reinforcement Learning', 'c')]
+        + [('─'*(box_width-6), 'c')]
+        + [('Training settings:', '')]
+        + [(f'  - {key}: {value}', '') for key, value in vars(training_config).items()]
+        + [('Agent hyperparameters:', '')]
+        + [(f'  - {key}: {value}', '') for key, value in vars(agent_config).items()],
+        thick=True) + '\n'
+    )
+
+    print('Training'.center(box_width) + '\n' + ('─'*(box_width-6)).center(box_width))
+
     # Train the agent based on the training configuration
-    trained_agent = train(training_config)
+    trained_agent = train(agent_config, training_config)
 
     # Set up the evaluation configuration
     evaluation_seed = training_seed + 37  # Different seed value for evaluation
@@ -144,8 +166,11 @@ def main():
         env_id=env_id,
         agent=trained_agent,
         n_episodes=evaluation_episodes,
-        seed=evaluation_seed
+        seed=evaluation_seed,
+        enable_recording=True
     )
+
+    print('\n' + 'Evaluation'.center(box_width) + '\n' + ('─'*(box_width-6)).center(box_width))
 
     # Evaluate the agent based on the evaluation configuration
     evaluate(evaluation_config)

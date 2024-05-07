@@ -12,6 +12,9 @@ from torch.distributions.categorical import Categorical
 from torch.utils.tensorboard import SummaryWriter
 import gymnasium as gym
 
+from config.agents_config import PPOConfig
+from config.experiment_config import TrainingConfig
+
 
 class BaseNetwork(nn.Module):
     """
@@ -96,18 +99,19 @@ class PPO:
     Attributes:
         env (gym.Env): The environment in which the agent operates.
         device (torch.device): The device (CPU or GPU) on which the computations are performed.
-        config (PPOConfig): Configuration parameters for setting up the PPO agent.
-        seed (int): Seed for the pseudo random generators.
+        agent_config (DQNConfig): The agent-specific configuration settings.
+        experiment_config (Union[TrainingConfig, TestingConfig): The experiment configuration.
     """
 
-    def __init__(self, env: gym.Env, device: torch.device, agent_config, experiment_config):
+    def __init__(self, env: gym.Env, device: torch.device, agent_config: PPOConfig, experiment_config: TrainingConfig):
         """
         Initializes the PPO agent with the environment, device, and configuration.
 
         Args:
             env (gym.Env): The gym environment.
             device (torch.device): The device (CPU or GPU) to perform computations.
-            agent_config (PPOConfig): A dataclass containing the agent's hyperparameter.
+            agent_config (DQNConfig): The agent-specific configuration settings.
+            experiment_config (Union[TrainingConfig, TestingConfig): The experiment configuration.
         """
 
         self.env = env                                        # The gym environment where the agent will interact
@@ -142,8 +146,11 @@ class PPO:
 
             # Check for early stopping if the environment is considered solved
             if self.is_environment_solved():
-                print(f'\nEnvironment solved in {self.t} timesteps!', end='\t')
-                print(f'Average Score: {np.mean(self.scores_window):.3f}')
+                str1 = f'Environment solved in {self.t} timesteps!'
+                str1 = str1.center(60)
+                str2 = f'Average Return: {np.mean(self.scores_window):.3f} | Number of Episodes: {self.episode_i}'
+                str2 = str2.center(60)
+                print(f'\n{str1}\n{str2}')
                 break
 
             # Learn using the collected batch of trajectories
@@ -200,7 +207,7 @@ class PPO:
 
                 # Print progress periodically
                 if self.t % self.print_every == 0:
-                    print(f'Timestep {self.t}\tAverage Score: {np.mean(self.scores_window):.3f}')
+                    print(f'     Timestep {self.t:>7}     \tAverage Return: {np.mean(self.scores_window):.3f}')
 
                 if done:
                     break  # If the episode is finished, exit the loop
