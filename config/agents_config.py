@@ -10,7 +10,7 @@ class DQNConfig:
         learning_rate (float): Learning rate for the optimizer.
         buffer_size (int): Size of the memory buffer.
         learning_starts (int): How many steps before learning starts
-        batch_size (int): Size of the batch used in the learning process.
+        minibatch_size (int): Size of the minibatch used in the learning process.
         tau (float): Interpolation parameter for updating the target network.
         gamma (float): Discount factor for future rewards.
         learn_frequency (int): Number of steps between each learning.
@@ -22,7 +22,7 @@ class DQNConfig:
     learning_rate: float = 5e-4
     buffer_size: int = int(1e6)
     learning_starts: int = 1000
-    batch_size: int = 128
+    minibatch_size: int = 128
     tau: float = 1e-3
     gamma: float = 0.99
     learn_frequency: int = 1

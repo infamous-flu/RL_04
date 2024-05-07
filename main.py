@@ -1,6 +1,6 @@
 import time
 import random
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 import torch
@@ -50,7 +50,8 @@ def evaluate(config: EvaluationConfig) -> float:
         episode_return = 0
         done = False
         while not done:
-            action = config.agent.select_action(observation, deterministic=config.deterministic)
+            action = config.agent.select_action(
+                observation, deterministic=config.deterministic)
             observation, reward, terminated, truncated, _ = env.step(action)
             episode_return += reward
             done = terminated or truncated
@@ -65,7 +66,7 @@ def evaluate(config: EvaluationConfig) -> float:
     return average_return
 
 
-def train(config: TrainingConfig):
+def train(config: TrainingConfig, agent_config: Optional[Union[DQNConfig, PPOConfig]] = None) -> Any:
     """Train a RL agent based on the provided configuration."""
 
     # Generate seed if it's not specified
@@ -97,11 +98,13 @@ def train(config: TrainingConfig):
     # Initialize the agent based on the agent type
     match config.agent_type:
         case 'dqn':
-            agent_config = DQNConfig()
-            agent = DQN(env, device, agent_config, config.seed)
+            if agent_config is None:
+                agent_config = DQNConfig()
+            agent = DQN(env, device, agent_config, config)
         case 'ppo':
-            agent_config = PPOConfig()
-            agent = PPO(env, device, agent_config, config.seed)
+            if agent_config is None:
+                agent_config = PPOConfig()
+            agent = PPO(env, device, agent_config, config)
         case _:
             raise ValueError(f'Unknown agent type: {config.agent_type}')
 

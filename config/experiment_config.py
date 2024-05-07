@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from agents.dqn import DQN
@@ -37,25 +37,25 @@ class TrainingConfig:
     seed: Optional[int] = None
     enable_recording: bool = True
     record_every: int = 100
-    video_folder = ''
-    name_prefix: str = ''
+    video_folder: Optional[str] = None
+    name_prefix: str = field(default='')
     score_threshold: int = 200
     scores_window_size: int = 100
     max_timesteps_per_episode: int = 1000
     print_every: int = 10000
     enable_logging: bool = True
-    log_dir: str = ''
+    log_dir: Optional[str] = None
     checkpoint_frequency: int = 20
-    save_path: str = ''
+    save_path: Optional[str] = None
 
     def __post_init__(self):
-        current_timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        if not self.video_folder:
-            self.video_folder = f'recordings/{self.env_id}/{self.agent_type}/{current_timestamp}/training'
-        if not self.log_dir:
-            self.log_dir = f'runs/{self.env_id}/{self.agent_type}/{current_timestamp}'
-        if not self.save_path:
-            self.save_path = f'saved_models/{self.env_id}/{self.agent_type}/model_{current_timestamp}.pth'
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        if self.video_folder is None:
+            self.video_folder = f'recordings/{self.env_id}/{self.agent_type}/{timestamp}/training'
+        if self.log_dir is None:
+            self.log_dir = f'runs/{self.env_id}/{self.agent_type}/{timestamp}'
+        if self.save_path is None:
+            self.save_path = f'saved_models/{self.env_id}/{self.agent_type}/model_{timestamp}.pth'
 
 
 @dataclass
@@ -84,8 +84,8 @@ class EvaluationConfig:
     model_path: Optional[str] = None
     enable_recording: bool = False
     record_every: int = 1
-    video_folder: str = ''
-    name_prefix: str = ''
+    video_folder: Optional[str] = None
+    name_prefix: str = field(default='')
 
     def __post_init__(self):
         if isinstance(self.agent, DQN):
@@ -95,7 +95,7 @@ class EvaluationConfig:
         else:
             raise TypeError(f'Unsupported agent type: {type(self.agent)}')
 
-        if not self.video_folder:
+        if self.video_folder is None:
             timestamp_match = None
             if hasattr(self.agent, 'save_path') and self.agent.save_path:
                 timestamp_match = re.search(r'(\d{8}\d{6})', self.agent.save_path)

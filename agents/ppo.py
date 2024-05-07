@@ -100,21 +100,21 @@ class PPO:
         seed (int): Seed for the pseudo random generators.
     """
 
-    def __init__(self, env: gym.Env, device: torch.device, config, seed: int = None):
+    def __init__(self, env: gym.Env, device: torch.device, agent_config, experiment_config):
         """
         Initializes the PPO agent with the environment, device, and configuration.
 
         Args:
             env (gym.Env): The gym environment.
             device (torch.device): The device (CPU or GPU) to perform computations.
-            config (PPOConfig): A dataclass containing all necessary hyperparameters.
-            seed (int): Seed for the pseudo random generators.
+            agent_config (PPOConfig): A dataclass containing the agent's hyperparameter.
         """
 
         self.env = env                                        # The gym environment where the agent will interact
         self.device = device                                  # The computation device (CPU or GPU)
-        self.config = config                                  # Configuration containing all hyperparameters
-        self.seed = seed                                      # Seed for the pseudo random generators
+        self.agent_config = agent_config                      # Configuration for agent hyperparameters
+        self.experiment_config = experiment_config            # Configuration for experiment settings
+        self.seed = self.experiment_config.seed               # Seed for the pseudo random generators
         if self.seed is not None:
             self._set_seed(self.seed)                         # Set the seed in various components
         self.n_observations = env.observation_space.shape[0]  # Number of features in the observation space
@@ -150,7 +150,7 @@ class PPO:
             self.learn(observations, actions, log_probs, rewards, values, dones)
 
             # Save the model at specified intervals
-            if self.batch_i % self.mode_save_frequency == 0:
+            if self.batch_i % self.checkpoint_frequency == 0:
                 self.save_model(self.save_path)
 
         # Final save and close the logger
@@ -441,12 +441,10 @@ class PPO:
             save_optimizer (bool): If True, saves the optimizer state as well. Defaults to False.
         """
 
-        checkpoint = {
-            'model_state_dict': self.actor_critic.state_dict()
-        }
+        model_and_or_optim = {'model_state_dict': self.actor_critic.state_dict()}
         if save_optimizer:
-            checkpoint['optimizer_state_dict'] = self.optimizer.state_dict()
-        torch.save(checkpoint, file_path)
+            model_and_or_optim['optimizer_state_dict'] = self.optimizer.state_dict()
+        torch.save(model_and_or_optim, file_path)
 
     def load_model(self, file_path: str, load_optimizer: bool = True):
         """
@@ -457,10 +455,10 @@ class PPO:
             load_optimizer (bool): If True, loads the optimizer state as well. Defaults to False.
         """
 
-        checkpoint = torch.load(file_path)
-        self.actor_critic.load_state_dict(checkpoint['model_state_dict'])
-        if load_optimizer and 'optimizer_state_dict' in checkpoint:
-            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        model_and_or_optim = torch.load(file_path)
+        self.actor_critic.load_state_dict(model_and_or_optim['model_state_dict'])
+        if load_optimizer and 'optimizer_state_dict' in model_and_or_optim:
+            self.optimizer.load_state_dict(model_and_or_optim['optimizer_state_dict'])
 
     def _prepare_tensors(self, observations: List[np.ndarray], actions: List[int],
                          log_probs: List[torch.Tensor], advantages: List[torch.Tensor]) -> \
@@ -505,24 +503,27 @@ class PPO:
         Initializes hyperparameters from the configuration.
         """
 
-        self.learning_rate = self.config.learning_rate
-        self.max_timesteps_per_batch = self.config.max_timesteps_per_batch
-        self.n_minibatches = self.config.n_minibatches
-        self.n_epochs = self.config.n_epochs
-        self.clip_range = self.config.clip_range
-        self.gamma = self.config.gamma
-        self.gae_lambda = self.config.gae_lambda
-        self.normalize_advantage = self.config.normalize_advantage
-        self.value_coef = self.config.value_coef
-        self.entropy_coef = self.config.entropy_coef
-        self.score_threshold = self.config.score_threshold
-        self.scores_window_size = self.config.scores_window_size
-        self.max_timesteps_per_episode = self.config.max_timesteps_per_episode
-        self.mode_save_frequency = self.config.model_save_frequency
-        self.print_every = self.config.print_every
-        self.enable_logging = self.config.enable_logging
-        self.log_dir = self.config.log_dir
-        self.save_path = self.config.save_path
+        # Agent hyperparameters
+        self.learning_rate = self.agent_config.learning_rate
+        self.max_timesteps_per_batch = self.agent_config.max_timesteps_per_batch
+        self.n_minibatches = self.agent_config.n_minibatches
+        self.n_epochs = self.agent_config.n_epochs
+        self.clip_range = self.agent_config.clip_range
+        self.gamma = self.agent_config.gamma
+        self.gae_lambda = self.agent_config.gae_lambda
+        self.normalize_advantage = self.agent_config.normalize_advantage
+        self.value_coef = self.agent_config.value_coef
+        self.entropy_coef = self.agent_config.entropy_coef
+
+        # Experiment settings
+        self.score_threshold = self.experiment_config.score_threshold
+        self.scores_window_size = self.experiment_config.scores_window_size
+        self.max_timesteps_per_episode = self.experiment_config.max_timesteps_per_episode
+        self.checkpoint_frequency = self.experiment_config.checkpoint_frequency
+        self.print_every = self.experiment_config.print_every
+        self.enable_logging = self.experiment_config.enable_logging
+        self.log_dir = self.experiment_config.log_dir
+        self.save_path = self.experiment_config.save_path
 
     def _init_network(self):
         """
@@ -536,9 +537,14 @@ class PPO:
     def _init_writer(self):
         """
         Initializes Tensorboard writer for logging if logging is enabled.
+        Additionally, logs all agent hyperparameters from the agent's configuration.
         """
 
         if self.enable_logging:
             self.writer = SummaryWriter(self.log_dir)
+            agent_hyperparameters = vars(self.agent_config)
+            hyperparameters_str = '\n'.join(
+                [f'{key}: {value}' for key, value in agent_hyperparameters.items()])
+            self.writer.add_text('PPO/Hyperparameters', hyperparameters_str)
         else:
             self.writer = None

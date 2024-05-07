@@ -116,29 +116,30 @@ class DQN:
     Attributes:
         env (gym.Env): The environment in which the agent operates.
         device (torch.device): The device (CPU or GPU) on which the computations are performed.
-        config (DQNConfig): Configuration parameters for setting up the DQN agent.
-        seed (int): Seed for the pseudo random generators.
+        agent_config (DQNConfig): The agent-specific configuration settings.
+        experiment_config (Union[TrainingConfig, TestingConfig): The experiment configuration.
     """
 
-    def __init__(self, env: gym.Env, device: torch.device, config, seed: int = None):
+    def __init__(self, env: gym.Env, device: torch.device, agent_config, experiment_config):
         """
         Initializes the DQN agent with the environment, device, and configuration.
 
         Args:
             env (gym.Env): The gym environment.
-            device (torch.device): The device (CPU or GPU) to perform computations.
-            config (DQNConfig): A dataclass containing all necessary hyperparameters.
-            seed (int): Seed for the pseudo random generators.
+            device (torch.device): The device(CPU or GPU) to perform computations.
+            agent_config (DQNConfig): The agent-specific configuration settings.
+            experiment_config (Union[TrainingConfig, TestingConfig): The experiment configuration.
         """
 
         self.env = env                                        # The gym environment where the agent will interact
         self.device = device                                  # The computation device (CPU or GPU)
-        self.config = config                                  # Configuration containing all hyperparameters
-        self.seed = seed                                      # Seed for the pseudo random generators
-        self.n_observations = env.observation_space.shape[0]  # Number of features in the observation space
-        self.n_actions = env.action_space.n                   # Number of possible actions
+        self.agent_config = agent_config                      # Configuration for agent hyperparameters
+        self.experiment_config = experiment_config            # Configuration for experiment settings
+        self.seed = self.experiment_config.seed               # Seed for the pseudo random generators
         if self.seed is not None:
             self._set_seed(self.seed)                         # Set the seed in various components
+        self.n_observations = env.observation_space.shape[0]  # Number of features in the observation space
+        self.n_actions = env.action_space.n                   # Number of possible actions
         self._init_hyperparameters()                          # Initialize the hyperparameters based on the configuration
         self._init_networks()                                 # Set up the neural network architecture
         self._init_writer()                                   # Prepare the TensorBoard writer for logging
@@ -149,7 +150,7 @@ class DQN:
         Trains the DQN agent for a given number of timesteps.
 
         Args:
-            n_timesteps (int): The number of timesteps to train the agent.
+            n_timesteps(int): The number of timesteps to train the agent.
         """
 
         self.t = 0                                                      # Initialize global timestep counter
@@ -165,7 +166,7 @@ class DQN:
                 break
 
             # Save the model at specified intervals
-            if self.episode_i % self.model_save_frequency == 0:
+            if self.episode_i % self.checkpoint_frequency == 0:
                 self.save_model(self.save_path)
 
         # Final save and close the logger
@@ -216,15 +217,15 @@ class DQN:
 
     def learn(self):
         """
-        Performs a learning update using the Deep Q-Learning (DQN) algorithm.
+        Performs a learning update using the Deep Q-Learning(DQN) algorithm.
         """
 
         # Check if enough samples are available in memory
-        if len(self.memory) < self.batch_size:
+        if len(self.memory) < self.minibatch_size:
             return
 
-        # Sample a batch of experiences from memory
-        experiences = self.memory.sample(self.batch_size)
+        # Sample a minibatch of experiences from memory
+        experiences = self.memory.sample(self.minibatch_size)
         observations, actions, next_observations, rewards, dones = zip(*experiences)
 
         # Prepare the data by converting to PyTorch tensors for neural network processing
@@ -260,9 +261,9 @@ class DQN:
         Selects an action based on the current observation using an epsilon-greedy policy.
 
         Args:
-            observation (NDArray[np.float32]): The current state observation from the environment.
-            deterministic (bool): If True, the action choice is deterministic (the max value action).
-                                  If False, the action is chosen stochastically with epsilon-greedy.
+            observation(NDArray[np.float32]): The current state observation from the environment.
+            deterministic(bool): If True, the action choice is deterministic(the max value action).
+                                 If False, the action is chosen stochastically with epsilon-greedy.
 
         Returns:
             int: The action selected by the agent.
@@ -314,16 +315,14 @@ class DQN:
         Optionally, it also saves the optimizer state.
 
         Args:
-            file_path (str): The path to the file where the model parameters are to be saved.
-            save_optimizer (bool): If True, saves the optimizer state as well. Defaults to False.
+            file_path(str): The path to the file where the model parameters are to be saved.
+            save_optimizer(bool): If True, saves the optimizer state as well. Defaults to False.
         """
 
-        checkpoint = {
-            'model_state_dict': self.policy_net.state_dict()
-        }
+        model_and_or_optim = {'model_state_dict': self.policy_net.state_dict()}
         if save_optimizer:
-            checkpoint['optimizer_state_dict'] = self.optimizer.state_dict()
-        torch.save(checkpoint, file_path)
+            model_and_or_optim['optimizer_state_dict'] = self.optimizer.state_dict()
+        torch.save(model_and_or_optim, file_path)
 
     def load_model(self, file_path: str, load_optimizer: bool = True):
         """
@@ -331,15 +330,15 @@ class DQN:
         Optionally, it also loads the optimizer state.
 
         Args:
-            file_path (str): The path to the file from which to load the model parameters.
-            load_optimizer (bool): If True, loads the optimizer state as well. Defaults to False.
+            file_path(str): The path to the file from which to load the model parameters.
+            load_optimizer(bool): If True, loads the optimizer state as well. Defaults to False.
         """
 
-        checkpoint = torch.load(file_path)
-        self.policy_net.load_state_dict(checkpoint['model_state_dict'])
+        model_and_or_optim = torch.load(file_path)
+        self.policy_net.load_state_dict(model_and_or_optim['model_state_dict'])
         self.target_net.load_state_dict(self.policy_net.state_dict())
-        if load_optimizer and 'optimizer_state_dict' in checkpoint:
-            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        if load_optimizer and 'optimizer_state_dict' in model_and_or_optim:
+            self.optimizer.load_state_dict(model_and_or_optim['optimizer_state_dict'])
 
     def _prepare_tensors(self, observations, actions, next_observations, rewards, dones):
         """
@@ -384,24 +383,27 @@ class DQN:
         Initializes hyperparameters from the configuration.
         """
 
-        self.learning_rate = self.config.learning_rate
-        self.buffer_size = self.config.buffer_size
-        self.learning_starts = self.config.learning_starts
-        self.batch_size = self.config.batch_size
-        self.tau = self.config.tau
-        self.gamma = self.config.gamma
-        self.learn_frequency = self.config.learn_frequency
-        self.epsilon = self.config.epsilon
-        self.eps_final = self.config.eps_final
-        self.eps_decay = self.config.eps_decay
-        self.score_threshold = self.config.score_threshold
-        self.scores_window_size = self.config.scores_window_size
-        self.max_timesteps_per_episode = self.config.max_timesteps_per_episode
-        self.model_save_frequency = self.config.model_save_frequency
-        self.print_every = self.config.print_every
-        self.enable_logging = self.config.enable_logging
-        self.log_dir = self.config.log_dir
-        self.save_path = self.config.save_path
+        # Agent hyperparameters
+        self.learning_rate = self.agent_config.learning_rate
+        self.buffer_size = self.agent_config.buffer_size
+        self.learning_starts = self.agent_config.learning_starts
+        self.minibatch_size = self.agent_config.minibatch_size
+        self.tau = self.agent_config.tau
+        self.gamma = self.agent_config.gamma
+        self.learn_frequency = self.agent_config.learn_frequency
+        self.epsilon = self.agent_config.epsilon
+        self.eps_final = self.agent_config.eps_final
+        self.eps_decay = self.agent_config.eps_decay
+
+        # Experiment settings
+        self.score_threshold = self.experiment_config.score_threshold
+        self.scores_window_size = self.experiment_config.scores_window_size
+        self.max_timesteps_per_episode = self.experiment_config.max_timesteps_per_episode
+        self.checkpoint_frequency = self.experiment_config.checkpoint
+        self.print_every = self.experiment_config.print_every
+        self.enable_logging = self.experiment_config.enable_logging
+        self.log_dir = self.experiment_config.log_dir
+        self.save_path = self.experiment_config.save_path
 
     def _init_networks(self):
         """
@@ -418,9 +420,14 @@ class DQN:
     def _init_writer(self):
         """
         Initializes Tensorboard writer for logging if logging is enabled.
+        Additionally, logs all agent hyperparameters from the agent's configuration.
         """
 
         if self.enable_logging:
             self.writer = SummaryWriter(self.log_dir)
+            agent_hyperparameters = vars(self.agent_config)
+            hyperparameters_str = '\n'.join(
+                [f'{key}: {value}' for key, value in agent_hyperparameters.items()])
+            self.writer.add_text('DQN/Hyperparameters', hyperparameters_str)
         else:
             self.writer = None
