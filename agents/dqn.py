@@ -141,7 +141,7 @@ class DQN:
             self._set_seed(seed)                              # Set the seed in various components
         self.n_observations = env.observation_space.shape[0]  # Number of features in the observation space
         self.n_actions = env.action_space.n                   # Number of possible actions
-        self._init_hyperparameters()                          # Initialize the hyperparameters based on the configuration
+        self._init_hyperparameters()                          # Initialize the hyperparameters
         self._init_networks()                                 # Set up the neural network architecture
         self.memory = ReplayMemory(self.buffer_size)          # Initialize the replay memory
 
@@ -165,6 +165,7 @@ class DQN:
         self.t = 0                                                      # Initialize global timestep counter
         self.episode_i = 0                                              # Initialize episode counter
         self.scores_window = deque([], maxlen=self.scores_window_size)  # Used for tracking the average score
+        self.threshold_reached = False                                  # Track if 'conventional' threshold is reached
 
         while self.t < self.n_timesteps:
             self.rollout()  # Perform one episode of interaction with the environment
@@ -228,15 +229,18 @@ class DQN:
         self.scores_window.append(score)  # Record the score
 
         # Print when 'conventional' threshold first reached
-        if self.print_every > 0 and np.mean(self.scores_window) >= self.score_threshold:
+        if self.print_every > 0 and len(self.scores_window) == self.scores_window_size \
+                and np.mean(self.scores_window) >= self.score_threshold and not self.threshold_reached:
             str3 = f'Score threshold reached in {self.t} timesteps.'
             print('\n' + str3.center(60) + '\n')
+            self.threshold_reached = True
 
         if self.enable_logging:
-            self.writer.add_scalar('Common/AverageReturn', np.mean(self.scores_window), self.t)  # Log the average score
-            self.writer.add_scalar('Common/EpisodeReturn', score, self.t)                        # Log the score
-            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)        # Log the episode length
-            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)                  # Log epsilon
+            if len(self.scores_window) == self.scores_window_size:
+                self.writer.add_scalar('Common/AverageReturn', np.mean(self.scores_window), self.t)  # Log the average return
+            self.writer.add_scalar('Common/EpisodeReturn', score, self.t)                            # Log the episode return
+            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)            # Log the episode length
+            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)                      # Log exploration rate
 
     def train(self):
         """
