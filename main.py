@@ -171,7 +171,7 @@ def main():
 
     # Set up the general experiment configuration
     env_id = 'LunarLander-v2'                                              # The ID of the gym environment
-    agent_type = 'ppo'  # or 'dqn'                                         # The type of RL agent
+    agent_type = 'dqn'  # or 'dqn'                                         # The type of RL agent
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # The computational device (CPU or GPU)
 
     box_width = 60

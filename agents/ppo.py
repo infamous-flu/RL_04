@@ -153,7 +153,7 @@ class PPO:
 
             # Check for early stopping if the environment is considered solved
             if self.is_environment_solved():
-                str1 = f'Environment solved in {self.t} timesteps!'
+                str1 = f'Environment solved on timestep {self.t}!'
                 str1 = str1.center(60)
                 if self.print_every > 0:
                     print(f'\n{str1}')
@@ -236,7 +236,7 @@ class PPO:
             # Print when 'conventional' threshold first reached
             if self.print_every > 0 and len(self.scores_window) == self.scores_window_size \
                     and np.mean(self.scores_window) >= self.score_threshold and not self.threshold_reached:
-                str3 = f'Score threshold reached in {self.t} timesteps.'
+                str3 = f'Score threshold reached on timestep {self.t}.'
                 print('\n' + str3.center(60) + '\n')
                 self.threshold_reached = True
 
