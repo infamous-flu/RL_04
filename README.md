@@ -23,7 +23,7 @@ This project demonstrates Deep Q-Network (DQN) and Proximal Policy Optimization 
 
 1. **Clone the Repository**:
    ```bash
-   git clone <repository-url>
+   git clone git@github.com:infamous-flu/RL_04.git
    ```
 
 2. **Create a Conda environment**:
