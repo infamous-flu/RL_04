@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
 
 import torch
 
@@ -20,6 +20,7 @@ class BaseExperimentConfig:
         video_folder (Optional[str]): The directory to store recorded videos. If not provided, a default folder is generated.
         name_prefix (Optional[str]): A prefix for naming video files to differentiate experiments. Defaults to None.
         record_every (int): Specifies the interval (in episodes) at which episodes should be recorded. Must be positive.
+        kwargs (Dict[str, Any]): Additional keyword arguments for gym environment customization.
     """
 
     env_id: str
@@ -30,6 +31,7 @@ class BaseExperimentConfig:
     video_folder: Optional[str] = None
     name_prefix: Optional[str] = None
     record_every: int = 100
+    kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

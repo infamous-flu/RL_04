@@ -126,14 +126,18 @@ class PPO:
 
     def train(self, training_config: TrainingConfig):
         """
-        Trains the PPO agent ...
+        Trains the PPO agent for a specified number of timesteps.
+
+        The training process uses the provided configuration to initialize the environment,
+        set up logging, and periodically save checkpoints.
 
         Args:
-            training_config (TrainingConfig): ...
+            training_config (TrainingConfig): Configuration object for training parameters, such as environment,
+                                              number of timesteps, logging settings, etc.
         """
 
         self.training_config = training_config
-        self._init_training_settings()
+        self._init_training_settings()             # Initialize training parameters
         self._set_seed(self.training_config.seed)  # Set the seed in various components
         self._init_writer()                        # Prepare the TensorBoard writer for logging
 
@@ -161,6 +165,7 @@ class PPO:
             if self.checkpoint_frequency > 0 and self.batch_i % self.checkpoint_frequency == 0:
                 self.save_model(self.save_path)
 
+        # Print training summary
         if self.print_every > 0:
             str2 = f'Average Return: {np.mean(self.scores_window):.3f} | Number of Episodes: {self.episode_i}'
             print(str2.center(60))

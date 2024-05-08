@@ -54,7 +54,7 @@ def evaluate_agent(agent: Any, evaluation_config: EvaluationConfig) -> float:
             if not isinstance(agent, PPO):
                 raise TypeError(f'Expected a PPO agent for evaluation, but got {type(agent).__name__}.')
         case _:
-            raise ValueError(f"Unknown agent type: {evaluation_config.agent_type}")
+            raise ValueError(f'Unknown agent type: {evaluation_config.agent_type}')
 
     # Generate seed if it's not specified
     if evaluation_config.seed is None:
@@ -73,7 +73,7 @@ def evaluate_agent(agent: Any, evaluation_config: EvaluationConfig) -> float:
         )
 
     # Create the evaluation environment
-    env = gym.make(evaluation_config.env_id, render_mode='rgb_array')
+    env = gym.make(evaluation_config.env_id, render_mode='rgb_array', **evaluation_config.kwargs)
 
     # Enable video recording if specified
     if evaluation_config.enable_recording:
@@ -131,7 +131,7 @@ def train_agent(agent_config: Any, training_config: TrainingConfig) -> Any:
     torch.manual_seed(training_config.seed)
 
     # Create the training environment
-    env = gym.make(training_config.env_id, render_mode='rgb_array')
+    env = gym.make(training_config.env_id, render_mode='rgb_array', **training_config.kwargs)
 
     # Enable video recording if specified
     if training_config.enable_recording:
@@ -154,7 +154,7 @@ def train_agent(agent_config: Any, training_config: TrainingConfig) -> Any:
                 raise TypeError('Expected a PPOConfig instance for "ppo" agent type.')
             agent = PPO(env, training_config.device, agent_config, training_config.seed)
         case _:
-            raise ValueError(f"Unknown agent type: {training_config.agent_type}")
+            raise ValueError(f'Unknown agent type: {training_config.agent_type}')
 
     # Train the agent
     agent.train(training_config)
