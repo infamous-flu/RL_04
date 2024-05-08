@@ -123,7 +123,6 @@ class PPO:
         self.n_actions = env.action_space.n                   # Number of possible actions
         self._init_hyperparameters()                          # Initialize the hyperparameters based on the configuration
         self._init_network()                                  # Set up the neural network architecture
-        self._init_writer()                                   # Prepare the TensorBoard writer for logging
 
     def train(self, training_config: TrainingConfig):
         """
@@ -135,7 +134,8 @@ class PPO:
 
         self.training_config = training_config
         self._init_training_settings()
-        self._set_seed(self.training_config.seed)
+        self._set_seed(self.training_config.seed)  # Set the seed in various components
+        self._init_writer()                        # Prepare the TensorBoard writer for logging
 
         self.t = 0                                                      # Initialize global timestep counter
         self.batch_i = 0                                                # Initialize batch counter

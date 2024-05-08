@@ -184,7 +184,7 @@ def main():
 
     # Set up the training configuration
     training_seed = 69420          # Seed for training reproducibility
-    training_timesteps = int(1e7)  # Number of timesteps for training
+    training_timesteps = int(1e6)  # Number of timesteps for training
 
     training_config = TrainingConfig(
         env_id=env_id,

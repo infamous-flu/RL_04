@@ -18,7 +18,7 @@ class BaseExperimentConfig:
         seed (Optional[int]): A global random seed for reproducibility. Defaults to `None`, which generates a seed.
         enable_recording (bool): Specifies whether to record training/evaluation videos. Defaults to `True`.
         video_folder (Optional[str]): The directory to store recorded videos. If not provided, a default folder is generated.
-        name_prefix (str): A prefix for naming video files to differentiate experiments. Defaults to an empty string.
+        name_prefix (Optional[str]): A prefix for naming video files to differentiate experiments. Defaults to None.
         record_every (int): Specifies the interval (in episodes) at which episodes should be recorded. Must be positive.
     """
 
@@ -28,7 +28,7 @@ class BaseExperimentConfig:
     seed: Optional[int] = None
     enable_recording: bool = True
     video_folder: Optional[str] = None
-    name_prefix: str = field(default='')
+    name_prefix: Optional[str] = None
     record_every: int = 100
 
 
@@ -94,7 +94,7 @@ class TrainingConfig(BaseExperimentConfig):
 
         # Generate default log directory if not provided
         if self.log_dir is None:
-            self.log_dir = os.path.join('recordings', self.env_id, self.agent_type, timestamp)
+            self.log_dir = os.path.join('runs', self.env_id, self.agent_type, timestamp)
 
         # Generate default model saving path if not provided
         if self.save_path is None:

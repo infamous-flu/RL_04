@@ -20,9 +20,9 @@ class DQNConfig:
     """
 
     learning_rate: float = 5e-4
-    buffer_size: int = int(1e6)
+    buffer_size: int = int(1e5)
     learning_starts: int = 1000
-    minibatch_size: int = 128
+    minibatch_size: int = 64
     tau: float = 1e-3
     gamma: float = 0.99
     learn_frequency: int = 1
