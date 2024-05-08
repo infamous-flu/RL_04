@@ -23,7 +23,7 @@ def evaluate_agent(agent: Any, evaluation_config: EvaluationConfig) -> float:
 
     Args:
         agent (Any): The trained agent object to be evaluated.
-        evaluation_config (EvaluationConfig): Configuration for the evaluation, including environment and video settings.
+        evaluation_config (EvaluationConfig): Configuration for the evaluation.
 
     Returns:
         float: The average reward obtained by the agent across the evaluation episodes.
@@ -69,7 +69,7 @@ def evaluate_agent(agent: Any, evaluation_config: EvaluationConfig) -> float:
     if evaluation_config.video_folder is None:
         timestamp = extract_timestamp(agent)
         evaluation_config.video_folder = os.path.join(
-            'recordings', evaluation_config.env_id, evaluation_config.agent_type, timestamp, 'evaluation'
+            'recordings', evaluation_config.env_id, evaluation_config.agent_type, timestamp
         )
 
     # Create the evaluation environment
@@ -110,11 +110,11 @@ def evaluate_agent(agent: Any, evaluation_config: EvaluationConfig) -> float:
 
 def train_agent(agent_config: Any, training_config: TrainingConfig) -> Any:
     """
-    Train an RL agent based on the provided configuration.
+    Train an RL agent over a number of timesteps based on the provided configuration.
 
     Args:
-        agent_config (Any): Configuration object specific to the chosen RL agent (e.g., DQNConfig, PPOConfig).
-        training_config (TrainingConfig): The training configuration.
+        agent_config (Any): Configuration object specific to the chosen RL agent.
+        training_config (TrainingConfig): Configuration for the evaluation.
 
     Returns:
         Any: The trained agent object.

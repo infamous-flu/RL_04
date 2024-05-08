@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 import torch
@@ -90,7 +90,11 @@ class TrainingConfig(BaseExperimentConfig):
 
         # Generate default video folder if not provided
         if self.video_folder is None:
-            self.video_folder = os.path.join('recordings', self.env_id, self.agent_type, timestamp, 'training')
+            self.video_folder = os.path.join('recordings', self.env_id, self.agent_type, timestamp)
+
+        # Generate default name prefix if not provided
+        if self.name_prefix is None:
+            self.name_prefix = 'training'
 
         # Generate default log directory if not provided
         if self.log_dir is None:
@@ -147,3 +151,7 @@ class EvaluationConfig(BaseExperimentConfig):
             raise ValueError("Record interval (record_every) must be positive.")
         if self.n_episodes <= 0:
             raise ValueError('Number of episodes (n_episodes) must be positive.')
+
+        # Generate default name prefix if not provided
+        if self.name_prefix is None:
+            self.name_prefix = 'evaluation'
