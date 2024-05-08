@@ -1,4 +1,4 @@
-# Reinforcement Learning Assignment 4: Deep Reinforcement Learning Experiment
+# Reinforcement Learning Assignment 4: DQN vs. PPO
 
 This project demonstrates Deep Q-Network (DQN) and Proximal Policy Optimization (PPO) agents for reinforcement learning (RL) experiments using the LunarLander environment. The agents are trained and evaluated through configurable settings, with the results recorded and logged.
 
