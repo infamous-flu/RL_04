@@ -124,7 +124,7 @@ class PPO:
         self._init_hyperparameters()                          # Initialize the hyperparameters based on the configuration
         self._init_network()                                  # Set up the neural network architecture
 
-    def train(self, training_config: TrainingConfig):
+    def learn(self, training_config: TrainingConfig):
         """
         Trains the PPO agent for a specified number of timesteps.
 
@@ -159,7 +159,7 @@ class PPO:
                 break
 
             # Learn using the collected batch of trajectories
-            self.learn(observations, actions, log_probs, rewards, values, dones)
+            self.train(observations, actions, log_probs, rewards, values, dones)
 
             # Save the model at specified intervals
             if self.checkpoint_frequency > 0 and self.batch_i % self.checkpoint_frequency == 0:
@@ -248,7 +248,7 @@ class PPO:
 
         return observations, actions, log_probs, rewards, values, dones
 
-    def learn(self, observations: List[np.ndarray], actions: List[int], log_probs: List[torch.Tensor],
+    def train(self, observations: List[np.ndarray], actions: List[int], log_probs: List[torch.Tensor],
               rewards: List[List[float]], values: List[List[torch.Tensor]], dones: List[List[bool]]):
         """
         Performs a learning update using the Proximal Policy Optimization (PPO) algorithm.

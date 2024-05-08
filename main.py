@@ -157,7 +157,7 @@ def train_agent(agent_config: Any, training_config: TrainingConfig) -> Any:
             raise ValueError(f'Unknown agent type: {training_config.agent_type}')
 
     # Train the agent
-    agent.train(training_config)
+    agent.learn(training_config)
 
     # Close the environment after training
     env.close()
@@ -184,7 +184,7 @@ def main():
             agent_config = PPOConfig()
 
     # Set up the training configuration
-    training_seed = 69420          # Seed for training reproducibility
+    training_seed = 73             # Seed for training reproducibility
     training_timesteps = int(1e6)  # Number of timesteps for training
 
     training_config = TrainingConfig(

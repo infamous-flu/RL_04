@@ -145,7 +145,7 @@ class DQN:
         self._init_networks()                                 # Set up the neural network architecture
         self.memory = ReplayMemory(self.buffer_size)          # Initialize the replay memory
 
-    def train(self, training_config: TrainingConfig):
+    def learn(self, training_config: TrainingConfig):
         """
         Trains the DQN agent for a specified number of timesteps.
 
@@ -211,7 +211,7 @@ class DQN:
             self.memory.push(observation, action, next_observation, reward, done)  # Remember the experience
 
             if self.t >= self.learning_starts and self.t % self.learn_frequency == 0:
-                self.learn()  # Learn using the collected experiences
+                self.train()  # Learn using the collected experiences
 
             # Print progress periodically
             if self.print_every > 0 and self.t % self.print_every == 0:
@@ -238,7 +238,7 @@ class DQN:
             self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)        # Log the episode length
             self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)                  # Log epsilon
 
-    def learn(self):
+    def train(self):
         """
         Performs a learning update using the Deep Q-Learning(DQN) algorithm.
         """
