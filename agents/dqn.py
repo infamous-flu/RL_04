@@ -1,6 +1,6 @@
 import random
 from collections import deque, namedtuple
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -120,10 +120,10 @@ class DQN:
         env (gym.Env): The environment in which the agent operates.
         device (torch.device): The device (CPU or GPU) on which the computations are performed.
         agent_config (DQNConfig): The agent-specific configuration settings.
-        experiment_config (TrainingConfig): The experiment configuration.
+        seed (Optional[int]): Seed value for initialization.
     """
 
-    def __init__(self, env: gym.Env, device: torch.device, agent_config: DQNConfig, experiment_config: TrainingConfig):
+    def __init__(self, env: gym.Env, device: torch.device, agent_config: DQNConfig, seed: Optional[int]):
         """
         Initializes the DQN agent with the environment, device, and configuration.
 
@@ -131,16 +131,14 @@ class DQN:
             env (gym.Env): The gym environment.
             device (torch.device): The device(CPU or GPU) to perform computations.
             agent_config (DQNConfig): The agent-specific configuration settings.
-            experiment_config (TrainingConfig): The experiment configuration.
+            seed (Optional[int]): Seed value for initialization.
         """
 
         self.env = env                                        # The gym environment where the agent will interact
         self.device = device                                  # The computation device (CPU or GPU)
         self.agent_config = agent_config                      # Configuration for agent hyperparameters
-        self.experiment_config = experiment_config            # Configuration for experiment settings
-        self.seed = self.experiment_config.seed               # Seed for the pseudo random generators
-        if self.seed is not None:
-            self._set_seed(self.seed)                         # Set the seed in various components
+        if seed is not None:
+            self._set_seed(seed)                              # Set the seed in various components
         self.n_observations = env.observation_space.shape[0]  # Number of features in the observation space
         self.n_actions = env.action_space.n                   # Number of possible actions
         self._init_hyperparameters()                          # Initialize the hyperparameters based on the configuration
@@ -148,19 +146,23 @@ class DQN:
         self._init_writer()                                   # Prepare the TensorBoard writer for logging
         self.memory = ReplayMemory(self.buffer_size)          # Initialize the replay memory
 
-    def train(self, n_timesteps: int):
+    def train(self, training_config: TrainingConfig):
         """
-        Trains the DQN agent for a given number of timesteps.
+        Trains the DQN agent ...
 
         Args:
-            n_timesteps(int): The number of timesteps to train the agent.
+            training_config (TrainingConfig): ...
         """
+
+        self.training_config = training_config
+        self._init_training_settings()
+        self._set_seed(self.training_config.seed)
 
         self.t = 0                                                      # Initialize global timestep counter
         self.episode_i = 0                                              # Initialize episode counter
         self.scores_window = deque([], maxlen=self.scores_window_size)  # Used for tracking the average score
 
-        while self.t < n_timesteps:
+        while self.t < self.n_timesteps:
             self.rollout()  # Perform one episode of interaction with the environment
 
             # Check for early stopping if the environment is considered solved
@@ -392,7 +394,6 @@ class DQN:
         Initializes hyperparameters from the configuration.
         """
 
-        # Agent hyperparameters
         self.learning_rate = self.agent_config.learning_rate
         self.buffer_size = self.agent_config.buffer_size
         self.learning_starts = self.agent_config.learning_starts
@@ -404,15 +405,20 @@ class DQN:
         self.eps_final = self.agent_config.eps_final
         self.eps_decay = self.agent_config.eps_decay
 
-        # Experiment settings
-        self.score_threshold = self.experiment_config.score_threshold
-        self.scores_window_size = self.experiment_config.scores_window_size
-        self.max_timesteps_per_episode = self.experiment_config.max_timesteps_per_episode
-        self.checkpoint_frequency = self.experiment_config.checkpoint
-        self.print_every = self.experiment_config.print_every
-        self.enable_logging = self.experiment_config.enable_logging
-        self.log_dir = self.experiment_config.log_dir
-        self.save_path = self.experiment_config.save_path
+    def _init_training_settings(self):
+        """
+        Initializes training settings from the configuration.
+        """
+
+        self.n_timesteps = self.training_config.n_timesteps
+        self.score_threshold = self.training_config.score_threshold
+        self.scores_window_size = self.training_config.scores_window_size
+        self.max_timesteps_per_episode = self.training_config.max_timesteps_per_episode
+        self.checkpoint_frequency = self.training_config.checkpoint_frequency
+        self.print_every = self.training_config.print_every
+        self.enable_logging = self.training_config.enable_logging
+        self.log_dir = self.training_config.log_dir
+        self.save_path = self.training_config.save_path
 
     def _init_networks(self):
         """
