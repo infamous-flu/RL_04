@@ -99,6 +99,7 @@ def evaluate_agent(agent: Any, evaluation_config: EvaluationConfig) -> float:
             done = terminated or truncated
         returns.append(episode_return)
         observation, _ = env.reset()
+    env.close()
 
     # Compute the average return across all episodes
     average_return = sum(returns) / evaluation_config.n_episodes

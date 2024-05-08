@@ -169,15 +169,17 @@ class DQN:
             if self.is_environment_solved():
                 str1 = f'Environment solved in {self.t} timesteps!'
                 str1 = str1.center(60)
-                str2 = f'Average Return: {np.mean(self.scores_window):.3f} | Number of Episodes: {self.episode_i}'
-                str2 = str2.center(60)
                 if self.print_every > 0:
-                    print(f'\n{str1}\n{str2}')
+                    print(f'\n{str1}')
                 break
 
             # Save the model at specified intervals
             if self.checkpoint_frequency > 0 and self.episode_i % self.checkpoint_frequency == 0:
                 self.save_model(self.save_path)
+
+        if self.print_every > 0:
+            str2 = f'Average Return: {np.mean(self.scores_window):.3f} | Number of Episodes: {self.episode_i}'
+            print(str2.center(60))
 
         # Final save and close the logger
         if self.checkpoint_frequency > 0:
