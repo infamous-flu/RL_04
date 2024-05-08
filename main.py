@@ -104,7 +104,7 @@ def evaluate_agent(agent: Any, evaluation_config: EvaluationConfig) -> float:
     # Compute the average return across all episodes
     average_return = sum(returns) / evaluation_config.n_episodes
     res_str = f'Average return over {evaluation_config.n_episodes} episodes: {average_return:.3f}'
-    print(res_str.center(60))
+    print(res_str.center(60) + '\n')
 
     return average_return
 
