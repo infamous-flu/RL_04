@@ -90,7 +90,7 @@ class TrainingConfig(BaseExperimentConfig):
 
         # Generate default video folder if not provided
         if self.video_folder is None:
-            self.video_folder = os.path.join('recordings', self.env_id, self.agent_type, timestamp)
+            self.video_folder = os.path.join('recordings', self.env_id, self.agent_type, timestamp, 'training')
 
         # Generate default name prefix if not provided
         if self.name_prefix is None:

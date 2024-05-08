@@ -69,7 +69,7 @@ def evaluate_agent(agent: Any, evaluation_config: EvaluationConfig) -> float:
     if evaluation_config.video_folder is None:
         timestamp = extract_timestamp(agent)
         evaluation_config.video_folder = os.path.join(
-            'recordings', evaluation_config.env_id, evaluation_config.agent_type, timestamp
+            'recordings', evaluation_config.env_id, evaluation_config.agent_type, timestamp, 'evaluation'
         )
 
     # Create the evaluation environment
@@ -171,7 +171,7 @@ def main():
 
     # Set up the general experiment configuration
     env_id = 'LunarLander-v2'                                              # The ID of the gym environment
-    agent_type = 'dqn'  # or 'ppo'                                         # The type of RL agent
+    agent_type = 'ppo'  # or 'dqn'                                         # The type of RL agent
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # The computational device (CPU or GPU)
 
     box_width = 60
