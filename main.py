@@ -225,12 +225,12 @@ def main():
     print('Training'.center(box_width) + '\n' + ('─'*(box_width-6)).center(box_width))
 
     # Train the agent based on the training configuration
-    # trained_agent = train_agent(agent_config, training_config)
+    trained_agent = train_agent(agent_config, training_config)
 
     print('\n' + 'Evaluation'.center(box_width) + '\n' + ('─'*(box_width-6)).center(box_width))
 
     # Evaluate the agent based on the evaluation configuration
-    # evaluate_agent(trained_agent, evaluation_config)
+    evaluate_agent(trained_agent, evaluation_config)
 
 
 if __name__ == '__main__':
