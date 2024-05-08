@@ -232,6 +232,11 @@ class PPO:
             self.episode_i += 1               # Increment the episode counter
             self.scores_window.append(score)  # Record the score
 
+            # Print when 'conventional' threshold first reached
+            if self.print_every > 0 and np.mean(self.scores_window) >= self.score_threshold:
+                str3 = f'Score threshold reached in {self.t} timesteps.'
+                print('\n' + str3.center(60) + '\n')
+
             if self.enable_logging:
                 self.writer.add_scalar('Common/AverageReturn', np.mean(self.scores_window), self.t)  # Log the average score
                 self.writer.add_scalar('Common/EpisodeReturn', score, self.t)                        # Log the score
