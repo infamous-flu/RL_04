@@ -46,7 +46,7 @@ Use the **`main.py`** script to train and evaluate the agents:
 
 2. **Customize Training**:
 - Modify the **`main.py`** file to adjust the environment parameters via the **`kwargs`** argument.
-- Update the agent configuration (e.g. **`DQNConfig`** or **`PPOConfig`**) as needed.
+- Update the agent configuration (e.g. `DQNConfig` or `PPOConfig`) as needed.
 
 3. **Visualize Results**:
 - Check the recordings folder for training and evaluation videos (if recording is enabled).
