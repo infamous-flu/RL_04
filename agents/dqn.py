@@ -190,7 +190,7 @@ class DQN:
                 evaluation_config.seed = int(time.time() * 1000) % (2 ** 32 - 1)
 
             # Calculate the initial seed for this evaluation
-            eval_seed = evaluation_config.seed + self.t % 10000
+            eval_seed = evaluation_config.seed + self.t // 10000
 
             # Set seeds for reproducibility
             random.seed(eval_seed)
@@ -256,8 +256,21 @@ class DQN:
 
     def learn(self, training_config: TrainingConfig, evaluation_config: Optional[EvaluationConfig]):
         """
-        Placeholder...
+        Train the DQN agent using the given training configuration and optionally evaluate during training.
+
+        Args:
+            training_config (TrainingConfig): The configuration containing training parameters.
+            evaluation_config (Optional[EvaluationConfig]): Optional configuration for evaluation parameters.
         """
+
+        if training_config.evaluate_every > 0 and evaluation_config is None:
+            raise ValueError('Evaluation configuration is required because `evaluate_every` is set.')
+
+        if training_config.env_id != evaluation_config.env_id:
+            raise ValueError(f'Training and evaluation environment IDs do not match.')
+
+        if training_config.agent_type != evaluation_config.agent_type:
+            raise ValueError(f'Training and evaluation agent types do not match.')
 
         self.training_config = training_config
         if evaluation_config is not None:
@@ -283,15 +296,11 @@ class DQN:
                     print(f'\n{str1}')
                 break
 
-            # Save the model at specified intervals
-            if self.checkpoint_frequency > 0 and self.episode_i % self.checkpoint_frequency == 0:
-                self.save_model(self.save_path)
-
         # Final evaluation
         if self.evaluate_every > 0:
             average_evaluation_return = self.evaluate(self.evaluation_config)
             if self.enable_logging:
-                self.writer.add('Common/AverageEvaluationReturn', average_evaluation_return, self.t)
+                self.writer.add_scalar('Common/EvaluationReturn', average_evaluation_return, self.t)
         else:
             average_evaluation_return = None
 
@@ -301,7 +310,7 @@ class DQN:
             if average_evaluation_return is not None:
                 str3 = f'Evaluation Return: {average_evaluation_return:.3f}'
             str4 = f'Number of Episodes: {self.episode_i}'
-            print(f'{str2}  |  {str3}  |  {str4}'.center(88))
+            print('    ' + f'{str2}  |  {str3}  |  {str4}'.center(86))
 
         # Final save and close the logger
         if self.checkpoint_frequency > 0:
@@ -327,14 +336,19 @@ class DQN:
             score += reward                                                        # Update the score
             self.memory.push(observation, action, next_observation, reward, done)  # Remember the experience
 
+            # Update the Q-Network using the collected experiences
             if self.t >= self.learning_starts and self.t % self.learn_every == 0:
-                self.train()  # Learn using the collected experiences
+                self.train()
+
+            # Save the model at specified intervals
+            if self.checkpoint_frequency > 0 and self.t % self.checkpoint_frequency == 0:
+                self.save_model(self.save_path)
 
             # Evaluate the agent periodically
             if self.evaluate_every > 0 and (self.t % self.evaluate_every == 0 or self.t == 1):
                 average_evaluation_return = self.evaluate(self.evaluation_config)
                 if self.enable_logging:
-                    self.writer.add_scalar('Common/AverageEvaluationReturn', average_evaluation_return, self.t)
+                    self.writer.add_scalar('Common/EvaluationReturn', average_evaluation_return, self.t)
             else:
                 average_evaluation_return = None
 
@@ -345,7 +359,7 @@ class DQN:
                 res3 = ''
                 if average_evaluation_return is not None:
                     res3 = f'Evaluation Return: {average_evaluation_return:.3f}'
-                print('    ' + res1.center(16) + '        ' + res2.center(25) + '        ' + res3.center(27))
+                print('    ' + res1.ljust(16) + '        ' + res2.ljust(25) + '        ' + res3.ljust(27))
 
             if done:
                 break  # If the episode is finished, exit the loop

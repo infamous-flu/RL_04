@@ -38,14 +38,15 @@ class TrainingConfig(BaseExperimentConfig):
         kwargs (Dict[str, Any]): Additional keyword arguments for gym environment customization.
         seed (Optional[int]): A global random seed for reproducibility. Defaults to `None`, which generates a seed.
         n_timesteps (int): The total number of timesteps for training. Must be positive.
-        evaluate_every (int): ...
-        score_threshold (int): Defines when the environment is considered solved.
+        evaluate_every (int): The interval at which evaluation is performed during training, in timesteps.
+                              If non-positive, evaluation is disabled.
+        score_threshold (int): The score threshold to define when the environment is considered solved.
         window_size (int): The window size for calculating rolling average scores and average episode length. Must be positive.
         max_timesteps_per_episode (int): Maximum timesteps per episode. Must be positive.
-        print_every (int): How often to print scores. Non-positive values disable printing.
+        print_every (int): How often to print scores (in timesteps). Non-positive values disable printing.
         enable_logging (bool): Whether logging is enabled or not. Defaults to `True`. 
         log_dir (Optional[str]): Directory for storing TensorBoard logs. If not provided, a default is generated.
-        checkpoint_frequency (Optional[int]): Specifies how frequently to save models. If `None`, automatic generation is triggered; non-positive values disable saving.
+        checkpoint_frequency (int): Specifies how frequently to save models. Non-positive values disable saving.
         save_path (Optional[str]): Path to save the model. If not provided, a default path is generated.
     """
 
@@ -57,7 +58,7 @@ class TrainingConfig(BaseExperimentConfig):
     print_every: int = 10000
     enable_logging: bool = True
     log_dir: Optional[str] = None
-    checkpoint_frequency: Optional[int] = None
+    checkpoint_frequency: int = 10000
     save_path: Optional[str] = None
 
     def __post_init__(self):
@@ -87,16 +88,6 @@ class TrainingConfig(BaseExperimentConfig):
         if self.save_path is None:
             self.save_path = os.path.join('saved_models', self.env_id, self.agent_type, f'model_{timestamp}.pth')
             os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
-
-        # Automatically determine the checkpoint frequency if it's None
-        if self.checkpoint_frequency is None:
-            match self.agent_type:
-                case 'dqn':
-                    self.checkpoint_frequency = 100
-                case 'ppo':
-                    self.checkpoint_frequency = 10
-                case _:
-                    raise ValueError(f'Unknown agent type: {self.agent_type}')
 
 
 @dataclass

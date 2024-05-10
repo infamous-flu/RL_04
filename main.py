@@ -20,21 +20,14 @@ def train_agent(agent_config: Union[DQNConfig, PPOConfig], training_config: Trai
 
     Args:
         agent_config (Union[DQNConfig, PPOConfig]): Configuration object specific to the chosen RL agent.
-        training_config (TrainingConfig): ...
-        evaluation_config (EvaluationConfig): ...        
+        training_config (TrainingConfig): The configuration containing training settings such as environment ID,
+                                          agent type, device (CPU/GPU), seed, and number of timesteps.
+        evaluation_config (Optional[EvaluationConfig]): The configuration object for evaluation settings like
+                                                        the number of evaluation episodes, environment ID, and seed.
 
     Returns:
         Union[DQN, PPO]: The trained agent object.
     """
-
-    if training_config.evaluate_every > 0 and evaluation_config is None:
-        raise ValueError('...')
-
-    if training_config.env_id != evaluation_config.env_id:
-        raise ValueError(f'...')
-
-    if training_config.agent_type != evaluation_config.agent_type:
-        raise ValueError(f'...')
 
     # Generate seed if it's not specified
     if training_config.seed is None:
@@ -59,7 +52,7 @@ def train_agent(agent_config: Union[DQNConfig, PPOConfig], training_config: Trai
                 raise TypeError('Expected a PPOConfig instance for "ppo" agent type.')
             agent = PPO(env, training_config.device, agent_config, training_config.seed)
         case _:
-            raise ValueError(f'Unknown agent type: {training_config.agent_type}')
+            raise ValueError(f'Unknown agent type: {training_config.agent_type}.')
 
     # Train the agent
     agent.learn(training_config, evaluation_config)
@@ -76,7 +69,7 @@ def main():
 
     # Set up the general experiment configuration
     env_id = 'LunarLander-v2'                                              # The ID of the gym environment
-    agent_type = 'dqn'  # or 'dqn'                                         # The type of RL agent
+    agent_type = 'ppo'  # or 'dqn'                                         # The type of RL agent
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # The computational device (CPU or GPU)
 
     box_width = 82

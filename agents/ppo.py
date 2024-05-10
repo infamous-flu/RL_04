@@ -169,7 +169,7 @@ class PPO:
                 evaluation_config.seed = int(time.time() * 1000) % (2 ** 32 - 1)
 
             # Calculate the initial seed for this evaluation
-            eval_seed = evaluation_config.seed + self.t % 10000
+            eval_seed = evaluation_config.seed + self.t // 10000
 
             # Set seeds for reproducibility
             random.seed(eval_seed)
@@ -179,7 +179,7 @@ class PPO:
             # Generate default video folder if not provided
             if evaluation_config.video_folder is None:
                 timestamp = extract_timestamp()
-                video_folder = os.path.join('recordings', self.env_id, 'dqn', timestamp)
+                video_folder = os.path.join('recordings', self.env_id, 'ppo', timestamp)
 
             # Generate default name prefix if not provided
             if evaluation_config.name_prefix is None:
@@ -236,8 +236,21 @@ class PPO:
 
     def learn(self, training_config: TrainingConfig, evaluation_config: Optional[EvaluationConfig] = None):
         """
-        Placeholder...
+        Train the PPO agent using the given training configuration and optionally evaluate during training.
+
+        Args:
+            training_config (TrainingConfig): The configuration containing training parameters.
+            evaluation_config (Optional[EvaluationConfig]): Optional configuration for evaluation parameters.
         """
+
+        if training_config.evaluate_every > 0 and evaluation_config is None:
+            raise ValueError('Evaluation configuration is required because `evaluate_every` is set.')
+
+        if training_config.env_id != evaluation_config.env_id:
+            raise ValueError(f'Training and evaluation environment IDs do not match.')
+
+        if training_config.agent_type != evaluation_config.agent_type:
+            raise ValueError(f'Training and evaluation agent types do not match.')
 
         self.training_config = training_config
         if evaluation_config is not None:
@@ -247,7 +260,6 @@ class PPO:
         self._init_writer()                                       # Prepare the TensorBoard writer for logging
 
         self.t = 0                                                # Initialize global timestep counter
-        self.batch_i = 0                                          # Initialize batch counter
         self.episode_i = 0                                        # Initialize episode counter
         self.returns_window = deque([], maxlen=self.window_size)  # Used for tracking the average returns
         self.lengths_window = deque([], maxlen=self.window_size)  # Used for tracking the average episode lengths
@@ -255,7 +267,6 @@ class PPO:
 
         while self.t < self.n_timesteps:
             observations, actions, log_probs, rewards, values, dones = self.rollout()  # Collect a batch of trajectories
-            self.batch_i += 1
 
             # Check for early stopping if the environment is considered solved
             if self.is_environment_solved():
@@ -268,15 +279,11 @@ class PPO:
             # Learn using the collected batch of trajectories
             self.train(observations, actions, log_probs, rewards, values, dones)
 
-            # Save the model at specified intervals
-            if self.checkpoint_frequency > 0 and self.batch_i % self.checkpoint_frequency == 0:
-                self.save_model(self.save_path)
-
         # Final evaluation
         if self.evaluate_every > 0:
             average_evaluation_return = self.evaluate(self.evaluation_config)
             if self.enable_logging:
-                self.writer.add('Common/AverageEvaluationReturn', average_evaluation_return, self.t)
+                self.writer.add_scalar('Common/EvaluationReturn', average_evaluation_return, self.t)
         else:
             average_evaluation_return = None
 
@@ -286,7 +293,7 @@ class PPO:
             if average_evaluation_return is not None:
                 str3 = f'Evaluation Return: {average_evaluation_return:.3f}'
             str4 = f'Number of Episodes: {self.episode_i}'
-            print(f'{str2}  |  {str3}  |  {str4}'.center(88))
+            print('    ' + f'{str2}  |  {str3}  |  {str4}'.center(88))
 
         # Final save and close the logger
         if self.checkpoint_frequency > 0:
@@ -338,9 +345,13 @@ class PPO:
                 if self.evaluate_every > 0 and (self.t % self.evaluate_every == 0 or self.t == 1):
                     average_evaluation_return = self.evaluate(self.evaluation_config)
                     if self.enable_logging:
-                        self.writer.add_scalar('Common/AverageEvaluationReturn', average_evaluation_return, self.t)
+                        self.writer.add_scalar('Common/EvaluationReturn', average_evaluation_return, self.t)
                 else:
                     average_evaluation_return = None
+
+                # Save the model at specified intervals
+                if self.checkpoint_frequency > 0 and self.t % self.checkpoint_frequency == 0:
+                    self.save_model(self.save_path)
 
                 # Print progress periodically
                 if self.print_every > 0 and self.t % self.print_every == 0:
@@ -349,7 +360,7 @@ class PPO:
                     res3 = ''
                     if average_evaluation_return is not None:
                         res3 = f'Evaluation Return: {average_evaluation_return:.3f}'
-                    print('    ' + res1.center(16) + '        ' + res2.center(25) + '        ' + res3.center(27))
+                    print('    ' + res1.ljust(16) + '        ' + res2.ljust(25) + '        ' + res3.ljust(27))
 
                 if done:
                     break  # If the episode is finished, exit the loop
@@ -368,7 +379,7 @@ class PPO:
             if self.print_every > 0 and self.episode_i >= self.window_size \
                     and np.mean(self.returns_window) >= self.score_threshold and not self.threshold_reached:
                 str5 = f'Score threshold reached on timestep {self.t}.'
-                print('\n' + str5.center(60) + '\n')
+                print('\n' + str5.center(88) + '\n')
                 self.threshold_reached = True
 
             if self.enable_logging:
@@ -673,6 +684,7 @@ class PPO:
         Initializes training settings from the configuration.
         """
 
+        self.env_id = self.training_config.env_id
         self.n_timesteps = self.training_config.n_timesteps
         self.evaluate_every = self.training_config.evaluate_every
         self.score_threshold = self.training_config.score_threshold
