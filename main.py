@@ -1,5 +1,6 @@
 import time
 import random
+import argparse
 from typing import Optional, Union
 
 import numpy as np
@@ -64,13 +65,15 @@ def train_agent(agent_config: Union[DQNConfig, PPOConfig], training_config: Trai
     return agent
 
 
-def main():
+def main(args):
     """Main function to set up configurations, train an agent, and evaluate its performance."""
 
     # Set up the general experiment configuration
-    env_id = 'LunarLander-v2'                                              # The ID of the gym environment
-    agent_type = 'dqn'                                                     # The type of RL agent ('dqn' or 'ppo')
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # The computational device (CPU or GPU)
+    env_id = args.env_id          # The ID of the gym environment
+    agent_type = args.agent_type  # The type of RL agent ('dqn' or 'ppo')
+
+    # The computational device (CPU or GPU)
+    device = torch.device('cuda' if torch.cuda.is_available() and args.device == 'cuda' else 'cpu')
 
     box_width = 82
 
@@ -80,10 +83,12 @@ def main():
             agent_config = DQNConfig()
         case 'ppo':
             agent_config = PPOConfig()
+        case _:
+            raise ValueError(f'Unknown agent type: {agent_type}.')
 
     # Set up the training configuration
-    training_seed = 42                     # Seed for training reproducibility
-    training_timesteps = int(3e5)          # Number of timesteps for training
+    training_seed = args.seed              # Seed for training reproducibility
+    training_timesteps = args.n_timesteps  # Number of timesteps for training
 
     training_config = TrainingConfig(
         env_id=env_id,
@@ -132,4 +137,17 @@ def main():
 
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
-    main()
+
+    DEFAULT_ENV_ID = 'LunarLander-v2'
+    DEFAULT_N_TIMESTEPS = int(3e5)
+    DEFAULT_DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    parser = argparse.ArgumentParser(description='Train and evaluate RL agents')
+    parser.add_argument('--env_id', type=str, default=DEFAULT_ENV_ID, help='Gym environment ID')
+    parser.add_argument('--agent_type', type=str, choices=['dqn', 'ppo'], required=True, help='Type of RL agent')
+    parser.add_argument('--device', type=str, choices=['cuda', 'cpu'], default=DEFAULT_DEVICE, help='Computation device to use')
+    parser.add_argument('--n_timesteps', type=int, default=DEFAULT_N_TIMESTEPS, help='Number of training timesteps')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducibility')
+    args = parser.parse_args()
+
+    main(args)
