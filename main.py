@@ -69,7 +69,7 @@ def main():
 
     # Set up the general experiment configuration
     env_id = 'LunarLander-v2'                                              # The ID of the gym environment
-    agent_type = 'ppo'  # or 'dqn'                                         # The type of RL agent
+    agent_type = 'dqn'                                                     # The type of RL agent ('dqn' or 'ppo')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # The computational device (CPU or GPU)
 
     box_width = 82
@@ -82,8 +82,8 @@ def main():
             agent_config = PPOConfig()
 
     # Set up the training configuration
-    training_seed = 1              # Seed for training reproducibility
-    training_timesteps = int(3e5)  # Number of timesteps for training
+    training_seed = 42                     # Seed for training reproducibility
+    training_timesteps = int(3e5)          # Number of timesteps for training
 
     training_config = TrainingConfig(
         env_id=env_id,
