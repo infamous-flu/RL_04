@@ -50,7 +50,7 @@ class TrainingConfig(BaseExperimentConfig):
         save_path (Optional[str]): Path to save the model. If not provided, a default path is generated.
     """
 
-    n_timesteps: int = 10000
+    n_timesteps: int
     evaluate_every: int = 10000
     score_threshold: int = 200
     window_size: int = 100
@@ -110,7 +110,7 @@ class EvaluationConfig(BaseExperimentConfig):
 
     n_episodes: int = 10
     deterministic: bool = True
-    record_every: int = 10
+    record_every: int = 6
     video_folder: Optional[str] = None
     name_prefix: Optional[str] = None
 

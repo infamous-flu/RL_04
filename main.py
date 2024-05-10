@@ -107,7 +107,6 @@ def main(args):
         agent_type=agent_type,
         n_episodes=evaluation_episodes,
         seed=evaluation_seed,
-        record_every=6
     )
 
     # Print a summary of the current configuration
@@ -147,7 +146,7 @@ if __name__ == '__main__':
     parser.add_argument('--agent_type', type=str, choices=['dqn', 'ppo'], required=True, help='Type of RL agent')
     parser.add_argument('--device', type=str, choices=['cuda', 'cpu'], default=DEFAULT_DEVICE, help='Computation device to use')
     parser.add_argument('--n_timesteps', type=int, default=DEFAULT_N_TIMESTEPS, help='Number of training timesteps')
-    parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducibility')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed for training reproducibility')
     args = parser.parse_args()
 
     main(args)
