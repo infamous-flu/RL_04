@@ -2,6 +2,7 @@ import os
 import re
 import time
 import random
+import warnings
 from datetime import datetime
 from collections import deque, namedtuple
 from typing import List, Optional, Tuple
@@ -168,8 +169,8 @@ class DQN:
 
             # Attempt to extract the timestamp from agent attributes
             for attr in ['log_dir', 'save_path']:
-                if hasattr(self.agent, attr):
-                    value = getattr(self.agent, attr, None)
+                if hasattr(self, attr):
+                    value = getattr(self, attr, None)
                     if value:
                         match = re.search(timestamp_pattern, value)
                         if match:
@@ -199,24 +200,28 @@ class DQN:
             # Generate default video folder if not provided
             if evaluation_config.video_folder is None:
                 timestamp = extract_timestamp()
-                evaluation_config.video_folder = os.path.join('recordings', self.env_id, 'dqn', timestamp)
+                video_folder = os.path.join('recordings', self.env_id, 'dqn', timestamp)
 
             # Generate default name prefix if not provided
             if evaluation_config.name_prefix is None:
-                evaluation_config.name_prefix = f'timestep-{self.t:07d}'
+                name_prefix = f'timestep-{self.t:07d}'
+            else:
+                name_prefix = evaluation_config.name_prefix
 
             # Create the evaluation environment
             eval_env = gym.make(self.env_id, render_mode='rgb_array', **evaluation_config.kwargs)
 
             # Enable video recording if specified
-            if evaluation_config.record_every > 0:
-                eval_env = RecordVideo(
-                    eval_env,
-                    video_folder=evaluation_config.video_folder,
-                    name_prefix=evaluation_config.name_prefix,
-                    episode_trigger=lambda x: x % evaluation_config.record_every == 0,
-                    disable_logger=True
-                )
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', category=UserWarning)
+                if evaluation_config.record_every > 0:
+                    eval_env = RecordVideo(
+                        eval_env,
+                        video_folder=video_folder,
+                        name_prefix=name_prefix,
+                        episode_trigger=lambda x: x % evaluation_config.record_every == 0,
+                        disable_logger=True
+                    )
 
             returns = []
 
@@ -257,11 +262,9 @@ class DQN:
         self.training_config = training_config
         if evaluation_config is not None:
             self.evaluation_config = evaluation_config
-        self._init_training_settings()                                   # Initialize training parameters
-        self._set_seed(self.training_config.seed)                        # Set the seed in various components
-        self._init_writer()                                              # Prepare the TensorBoard writer for logging
-        if self.enable_logging:
-            self.writer.add_text('DQN/Seed', self.training_config.seed)
+        self._init_training_settings()                            # Initialize training parameters
+        self._set_seed(self.training_config.seed)                 # Set the seed in various components
+        self._init_writer()                                       # Prepare the TensorBoard writer for logging
 
         self.t = 0                                                # Initialize global timestep counter
         self.episode_i = 0                                        # Initialize episode counter
@@ -284,15 +287,21 @@ class DQN:
             if self.checkpoint_frequency > 0 and self.episode_i % self.checkpoint_frequency == 0:
                 self.save_model(self.save_path)
 
+        # Final evaluation
         if self.evaluate_every > 0:
-            average_evaluation_return
+            average_evaluation_return = self.evaluate(self.evaluation_config)
+            if self.enable_logging:
+                self.writer.add('Common/AverageEvaluationReturn', average_evaluation_return, self.t)
         else:
             average_evaluation_return = None
 
         # Print training summary
         if self.print_every > 0:
-            str2 = f'Average Return: {np.mean(self.returns_window):.3f} | Number of Episodes: {self.episode_i}'
-            print(str2.center(88))
+            str2 = f'Training Return: {np.mean(self.returns_window):.3f}'
+            if average_evaluation_return is not None:
+                str3 = f'Evaluation Return: {average_evaluation_return:.3f}'
+            str4 = f'Number of Episodes: {self.episode_i}'
+            print(f'{str2}  |  {str3}  |  {str4}'.center(88))
 
         # Final save and close the logger
         if self.checkpoint_frequency > 0:
@@ -330,13 +339,13 @@ class DQN:
                 average_evaluation_return = None
 
             # Print progress periodically
-            if self.print_every > 0 and (self.t % self.print_every == 0 or self.t == 1):
+            if self.print_every > 0 and self.t % self.print_every == 0:
                 res1 = f'Timestep {self.t:>7}'
                 res2 = f'Training Return: {np.mean(self.returns_window):.3f}'
                 res3 = ''
                 if average_evaluation_return is not None:
                     res3 = f'Evaluation Return: {average_evaluation_return:.3f}'
-                print('    ' + res1.center(16) + '    ' + res2.center(25) + '    ' + res3.center(27))
+                print('    ' + res1.center(16) + '        ' + res2.center(25) + '        ' + res3.center(27))
 
             if done:
                 break  # If the episode is finished, exit the loop
@@ -378,8 +387,8 @@ class DQN:
         observations, actions, next_observations, rewards, dones = zip(*experiences)
 
         # Prepare the data by converting to PyTorch tensors for neural network processing
-        observations, actions, next_observations, rewards, dones = \
-            self._prepare_tensors(observations, actions, next_observations, rewards, dones)
+        observations, actions, next_observations, rewards, dones \
+            = self._prepare_tensors(observations, actions, next_observations, rewards, dones)
 
         # Compute current Q-values from policy network for the actions taken
         current_q_values = self.policy_net(observations).gather(1, actions.unsqueeze(1)).squeeze(-1)
@@ -451,7 +460,7 @@ class DQN:
         if len(self.returns_window) < self.window_size:
             return False  # Not enough scores for a valid evaluation
 
-        return np.mean(self.returns_window) - self.n_std * np.std(self.returns_window) > self.score_threshold
+        return np.mean(self.returns_window) - np.std(self.returns_window) > self.score_threshold
 
     def save_model(self, file_path: str, save_optimizer: bool = True):
         """
@@ -547,7 +556,7 @@ class DQN:
         self.n_timesteps = self.training_config.n_timesteps
         self.evaluate_every = self.training_config.evaluate_every
         self.score_threshold = self.training_config.score_threshold
-        self.window_size = self.training_config.scores_window_size
+        self.window_size = self.training_config.window_size
         self.max_timesteps_per_episode = self.training_config.max_timesteps_per_episode
         self.checkpoint_frequency = self.training_config.checkpoint_frequency
         self.print_every = self.training_config.print_every

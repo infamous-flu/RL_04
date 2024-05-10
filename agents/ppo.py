@@ -2,6 +2,7 @@ import os
 import re
 import time
 import random
+import warnings
 from datetime import datetime
 from collections import deque
 from typing import List, Optional, Tuple
@@ -147,8 +148,8 @@ class PPO:
 
             # Attempt to extract the timestamp from agent attributes
             for attr in ['log_dir', 'save_path']:
-                if hasattr(self.agent, attr):
-                    value = getattr(self.agent, attr, None)
+                if hasattr(self, attr):
+                    value = getattr(self, attr, None)
                     if value:
                         match = re.search(timestamp_pattern, value)
                         if match:
@@ -178,24 +179,28 @@ class PPO:
             # Generate default video folder if not provided
             if evaluation_config.video_folder is None:
                 timestamp = extract_timestamp()
-                evaluation_config.video_folder = os.path.join('recordings', self.env_id, 'ppo', timestamp)
+                video_folder = os.path.join('recordings', self.env_id, 'dqn', timestamp)
 
             # Generate default name prefix if not provided
             if evaluation_config.name_prefix is None:
-                evaluation_config.name_prefix = f'timestep-{self.t:07d}'
+                name_prefix = f'timestep-{self.t:07d}'
+            else:
+                name_prefix = evaluation_config.name_prefix
 
             # Create the evaluation environment
             eval_env = gym.make(self.env_id, render_mode='rgb_array', **evaluation_config.kwargs)
 
             # Enable video recording if specified
-            if evaluation_config.record_every > 0:
-                eval_env = RecordVideo(
-                    eval_env,
-                    video_folder=evaluation_config.video_folder,
-                    name_prefix=evaluation_config.name_prefix,
-                    episode_trigger=lambda x: x % evaluation_config.record_every == 0,
-                    disable_logger=True
-                )
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', category=UserWarning)
+                if evaluation_config.record_every > 0:
+                    eval_env = RecordVideo(
+                        eval_env,
+                        video_folder=video_folder,
+                        name_prefix=name_prefix,
+                        episode_trigger=lambda x: x % evaluation_config.record_every == 0,
+                        disable_logger=True
+                    )
 
             returns = []
 
@@ -338,13 +343,13 @@ class PPO:
                     average_evaluation_return = None
 
                 # Print progress periodically
-                if self.print_every > 0 and (self.t % self.print_every == 0 or self.t == 1):
+                if self.print_every > 0 and self.t % self.print_every == 0:
                     res1 = f'Timestep {self.t:>7}'
                     res2 = f'Training Return: {np.mean(self.returns_window):.3f}'
                     res3 = ''
                     if average_evaluation_return is not None:
                         res3 = f'Evaluation Return: {average_evaluation_return:.3f}'
-                    print('    ' + res1.center(16) + '    ' + res2.center(25) + '    ' + res3.center(27))
+                    print('    ' + res1.center(16) + '        ' + res2.center(25) + '        ' + res3.center(27))
 
                 if done:
                     break  # If the episode is finished, exit the loop
@@ -578,12 +583,7 @@ class PPO:
         if len(self.returns_window) < self.window_size:
             return False  # Not enough scores for a valid evaluation
 
-        # Calculate the mean score and standard deviation from the window
-        mean_score = np.mean(self.returns_window)
-        std_dev = np.std(self.returns_window, ddof=1)
-        lower_bound = mean_score - std_dev
-
-        return lower_bound > self.score_threshold
+        return np.mean(self.returns_window) - np.std(self.returns_window) > self.score_threshold
 
     def save_model(self, file_path: str, save_optimizer: bool = True):
         """

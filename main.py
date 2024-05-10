@@ -62,7 +62,7 @@ def train_agent(agent_config: Union[DQNConfig, PPOConfig], training_config: Trai
             raise ValueError(f'Unknown agent type: {training_config.agent_type}')
 
     # Train the agent
-    agent.learn(training_config)
+    agent.learn(training_config, evaluation_config)
 
     # Close the environment after training
     env.close()
@@ -101,15 +101,15 @@ def main():
     )
 
     # Set up the evaluation configuration
-    evaluation_seed = training_seed + 37  # Different seed value for evaluation
-    evaluation_episodes = 10              # Number of episodes for evaluation
+    evaluation_seed = training_seed + 37   # Different seed value for evaluation
+    evaluation_episodes = 10               # Number of episodes for evaluation
 
     evaluation_config = EvaluationConfig(
         env_id=env_id,
         agent_type=agent_type,
         n_episodes=evaluation_episodes,
         seed=evaluation_seed,
-        record_every=10
+        record_every=6
     )
 
     # Print a summary of the current configuration
@@ -129,8 +129,12 @@ def main():
         padding=4, thick=True) + '\n'
     )
 
+    print('    ' + 'Training and Evaluation Returns'.center(box_width) + '\n  ' + '─' * 88)
+
     # Train the agent based on the training configuration
-    # train_agent(agent_config, training_config, evaluation_config)
+    train_agent(agent_config, training_config, evaluation_config)
+
+    print()
 
 
 if __name__ == '__main__':
