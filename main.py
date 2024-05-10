@@ -83,7 +83,7 @@ def main():
 
     # Set up the training configuration
     training_seed = 1              # Seed for training reproducibility
-    training_timesteps = int(1e6)  # Number of timesteps for training
+    training_timesteps = int(3e5)  # Number of timesteps for training
 
     training_config = TrainingConfig(
         env_id=env_id,
@@ -94,7 +94,7 @@ def main():
     )
 
     # Set up the evaluation configuration
-    evaluation_seed = training_seed + 37   # Different seed value for evaluation
+    evaluation_seed = 110                  # Fixed seed value for evaluation
     evaluation_episodes = 10               # Number of episodes for evaluation
 
     evaluation_config = EvaluationConfig(
