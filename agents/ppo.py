@@ -293,7 +293,7 @@ class PPO:
             if average_evaluation_return is not None:
                 str3 = f'Evaluation Return: {average_evaluation_return:.3f}'
             str4 = f'Number of Episodes: {self.episode_i}'
-            print('  ' + f'{str2}  |  {str3}  |  {str4}'.center(86))
+            print(f'    {str2}  |  {str3}  |  {str4}')
 
         # Final save and close the logger
         if self.checkpoint_frequency > 0:
