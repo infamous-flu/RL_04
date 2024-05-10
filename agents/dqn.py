@@ -151,7 +151,7 @@ class DQN:
         self._init_networks()                                 # Set up the neural network architecture
         self.memory = ReplayMemory(self.buffer_size)          # Initialize the replay memory
 
-    def learn(self, training_config: TrainingConfig, evaluation_config: Optional[EvaluationConfig]):
+    def learn(self, training_config: TrainingConfig, evaluation_config: Optional[EvaluationConfig] = None):
         """
         Train the DQN agent using the given training configuration and optionally evaluate during training.
 
