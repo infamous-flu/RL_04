@@ -1,4 +1,8 @@
+import os
+import re
+import time
 import random
+from datetime import datetime
 from collections import deque, namedtuple
 from typing import List, Optional, Tuple
 
@@ -10,9 +14,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import gymnasium as gym
+from gymnasium.wrappers import RecordVideo
 
 from config.agents_config import DQNConfig
-from config.experiment_config import TrainingConfig
+from config.experiment_config import TrainingConfig, EvaluationConfig
 
 
 Experience = namedtuple('Experience', ('observation', 'action', 'next_observation', 'reward', 'done'))
@@ -145,27 +150,124 @@ class DQN:
         self._init_networks()                                 # Set up the neural network architecture
         self.memory = ReplayMemory(self.buffer_size)          # Initialize the replay memory
 
-    def learn(self, training_config: TrainingConfig):
+    def evaluate(self, evaluation_config: EvaluationConfig) -> float:
         """
-        Trains the DQN agent for a specified number of timesteps.
-
-        The training process uses the provided configuration to initialize the environment,
-        set up logging, and periodically save checkpoints.
+        Evaluate the agent based on the given configuration.
 
         Args:
-            training_config (TrainingConfig): Configuration object for training parameters, such as environment,
-                                              number of timesteps, logging settings, etc.
+            evaluation_config (EvaluationConfig): Configuration object containing evaluation parameters.
+
+        Returns:
+            float: Average return across all evaluation episodes.
+        """
+
+        def extract_timestamp() -> str:
+            """Extract the first timestamp from any of the provided paths or generate a new one."""
+
+            timestamp_pattern = r'\d{8}\-\d{6}|\d{8}\d{6}'
+
+            # Attempt to extract the timestamp from agent attributes
+            for attr in ['log_dir', 'save_path']:
+                if hasattr(self.agent, attr):
+                    value = getattr(self.agent, attr, None)
+                    if value:
+                        match = re.search(timestamp_pattern, value)
+                        if match:
+                            return match.group(0)
+
+            # Fallback to a new timestamp if no match is found
+            return datetime.now().strftime('%Y%m%d%H%M%S')
+
+        # Save the current random states to avoid interference
+        random_state = random.getstate()
+        np_random_state = np.random.get_state()
+        torch_random_state = torch.get_rng_state()
+
+        try:
+            # Generate seed if it's not specified
+            if evaluation_config.seed is None:
+                evaluation_config.seed = int(time.time() * 1000) % (2 ** 32 - 1)
+
+            # Calculate the initial seed for this evaluation
+            eval_seed = evaluation_config.seed + self.t % 10000
+
+            # Set seeds for reproducibility
+            random.seed(eval_seed)
+            np.random.seed(eval_seed)
+            torch.manual_seed(eval_seed)
+
+            # Generate default video folder if not provided
+            if evaluation_config.video_folder is None:
+                timestamp = extract_timestamp()
+                evaluation_config.video_folder = os.path.join('recordings', self.env_id, 'dqn', timestamp)
+
+            # Generate default name prefix if not provided
+            if evaluation_config.name_prefix is None:
+                evaluation_config.name_prefix = f'timestep-{self.t:07d}'
+
+            # Create the evaluation environment
+            eval_env = gym.make(self.env_id, render_mode='rgb_array', **evaluation_config.kwargs)
+
+            # Enable video recording if specified
+            if evaluation_config.record_every > 0:
+                eval_env = RecordVideo(
+                    eval_env,
+                    video_folder=evaluation_config.video_folder,
+                    name_prefix=evaluation_config.name_prefix,
+                    episode_trigger=lambda x: x % evaluation_config.record_every == 0,
+                    disable_logger=True
+                )
+
+            returns = []
+
+            # Evaluate the agent over a specified number of episodes
+            for episode in range(evaluation_config.n_episodes):
+                episode_return = 0
+                observation, _ = eval_env.reset(seed=eval_seed)
+                terminated, truncated = False, False
+                for _ in range(self.max_timesteps_per_episode):
+                    action = self.select_action(
+                        observation, deterministic=evaluation_config.deterministic
+                    )
+                    observation, reward, terminated, truncated, _ = eval_env.step(action)
+                    episode_return += reward
+                    if terminated or truncated:
+                        break
+                returns.append(episode_return)
+                eval_seed += 1  # Increment the seed for the next episode
+
+            eval_env.close()
+
+        finally:
+            # Restore the original random states to ensure no training impact
+            random.setstate(random_state)
+            np.random.set_state(np_random_state)
+            torch.set_rng_state(torch_random_state)
+
+        # Compute the average return across all episodes
+        average_evaluation_return = sum(returns) / evaluation_config.n_episodes
+
+        return average_evaluation_return
+
+    def learn(self, training_config: TrainingConfig, evaluation_config: Optional[EvaluationConfig]):
+        """
+        Placeholder...
         """
 
         self.training_config = training_config
-        self._init_training_settings()             # Initialize training parameters
-        self._set_seed(self.training_config.seed)  # Set the seed in various components
-        self._init_writer()                        # Prepare the TensorBoard writer for logging
+        if evaluation_config is not None:
+            self.evaluation_config = evaluation_config
+        self._init_training_settings()                                   # Initialize training parameters
+        self._set_seed(self.training_config.seed)                        # Set the seed in various components
+        self._init_writer()                                              # Prepare the TensorBoard writer for logging
+        if self.enable_logging:
+            self.writer.add_text('DQN/Seed', self.training_config.seed)
 
-        self.t = 0                                                      # Initialize global timestep counter
-        self.episode_i = 0                                              # Initialize episode counter
-        self.scores_window = deque([], maxlen=self.scores_window_size)  # Used for tracking the average score
-        self.threshold_reached = False                                  # Track if 'conventional' threshold is reached
+        self.t = 0                                                # Initialize global timestep counter
+        self.episode_i = 0                                        # Initialize episode counter
+        self.returns_window = deque([], maxlen=self.window_size)  # Used for tracking the average returns
+        self.lengths_window = deque([], maxlen=self.window_size)  # Used for tracking the average episode lengths
+        self.threshold_reached = False                            # Track if 'conventional' threshold is reached
 
         while self.t < self.n_timesteps:
             self.rollout()  # Perform one episode of interaction with the environment
@@ -173,7 +275,7 @@ class DQN:
             # Check for early stopping if the environment is considered solved
             if self.is_environment_solved():
                 str1 = f'Environment solved on timestep {self.t}!'
-                str1 = str1.center(60)
+                str1 = str1.center(88)
                 if self.print_every > 0:
                     print(f'\n{str1}')
                 break
@@ -182,10 +284,15 @@ class DQN:
             if self.checkpoint_frequency > 0 and self.episode_i % self.checkpoint_frequency == 0:
                 self.save_model(self.save_path)
 
+        if self.evaluate_every > 0:
+            average_evaluation_return
+        else:
+            average_evaluation_return = None
+
         # Print training summary
         if self.print_every > 0:
-            str2 = f'Average Return: {np.mean(self.scores_window):.3f} | Number of Episodes: {self.episode_i}'
-            print(str2.center(60))
+            str2 = f'Average Return: {np.mean(self.returns_window):.3f} | Number of Episodes: {self.episode_i}'
+            print(str2.center(88))
 
         # Final save and close the logger
         if self.checkpoint_frequency > 0:
@@ -211,12 +318,25 @@ class DQN:
             score += reward                                                        # Update the score
             self.memory.push(observation, action, next_observation, reward, done)  # Remember the experience
 
-            if self.t >= self.learning_starts and self.t % self.learn_frequency == 0:
+            if self.t >= self.learning_starts and self.t % self.learn_every == 0:
                 self.train()  # Learn using the collected experiences
 
+            # Evaluate the agent periodically
+            if self.evaluate_every > 0 and (self.t % self.evaluate_every == 0 or self.t == 1):
+                average_evaluation_return = self.evaluate(self.evaluation_config)
+                if self.enable_logging:
+                    self.writer.add_scalar('Common/AverageEvaluationReturn', average_evaluation_return, self.t)
+            else:
+                average_evaluation_return = None
+
             # Print progress periodically
-            if self.print_every > 0 and self.t % self.print_every == 0:
-                print(f'     Timestep {self.t:>7}     \tAverage Return: {np.mean(self.scores_window):.3f}')
+            if self.print_every > 0 and (self.t % self.print_every == 0 or self.t == 1):
+                res1 = f'Timestep {self.t:>7}'
+                res2 = f'Training Return: {np.mean(self.returns_window):.3f}'
+                res3 = ''
+                if average_evaluation_return is not None:
+                    res3 = f'Evaluation Return: {average_evaluation_return:.3f}'
+                print('    ' + res1.center(16) + '    ' + res2.center(25) + '    ' + res3.center(27))
 
             if done:
                 break  # If the episode is finished, exit the loop
@@ -225,22 +345,24 @@ class DQN:
 
         self.epsilon = max(self.epsilon * self.eps_decay, self.eps_final)  # Update the exploration rate
 
-        self.episode_i += 1               # Increment the episode counter
-        self.scores_window.append(score)  # Record the score
+        self.episode_i += 1                        # Increment the episode counter
+        self.returns_window.append(score)          # Record the score
+        self.lengths_window.append(episode_t + 1)  # Record the length
 
         # Print when 'conventional' threshold first reached
-        if self.print_every > 0 and len(self.scores_window) == self.scores_window_size \
-                and np.mean(self.scores_window) >= self.score_threshold and not self.threshold_reached:
-            str3 = f'Score threshold reached on timestep {self.t}.'
-            print('\n' + str3.center(60) + '\n')
+        if self.print_every > 0 and len(self.returns_window) == self.window_size \
+                and np.mean(self.returns_window) >= self.score_threshold and not self.threshold_reached:
+            str5 = f'Score threshold reached on timestep {self.t}.'
+            print('\n' + str5.center(88) + '\n')
             self.threshold_reached = True
 
         if self.enable_logging:
-            if len(self.scores_window) == self.scores_window_size:
-                self.writer.add_scalar('Common/AverageReturn', np.mean(self.scores_window), self.t)  # Log the average return
-            self.writer.add_scalar('Common/EpisodeReturn', score, self.t)                            # Log the episode return
-            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)            # Log the episode length
-            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)                      # Log exploration rate
+            if self.episode_i >= self.window_size:
+                self.writer.add_scalar('Common/AverageTrainingReturn', np.mean(self.returns_window), self.t)  # Log the average return
+                self.writer.add_scalar('Common/AverageEpisodeLength', np.mean(self.lengths_window), self.t)   # Log the average episode length
+            self.writer.add_scalar('Common/EpisodeReturn', score, self.episode_i)                             # Log the episode return
+            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)                     # Log the episode length
+            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)                               # Log the exploration rate
 
     def train(self):
         """
@@ -326,15 +448,10 @@ class DQN:
             bool: True if the environment is solved, False otherwise.
         """
 
-        if len(self.scores_window) < self.scores_window_size:
+        if len(self.returns_window) < self.window_size:
             return False  # Not enough scores for a valid evaluation
 
-        # Calculate the mean score and standard deviation from the window
-        mean_score = np.mean(self.scores_window)
-        std_dev = np.std(self.scores_window, ddof=1)
-        lower_bound = mean_score - std_dev
-
-        return lower_bound > self.score_threshold
+        return np.mean(self.returns_window) - self.n_std * np.std(self.returns_window) > self.score_threshold
 
     def save_model(self, file_path: str, save_optimizer: bool = True):
         """
@@ -416,7 +533,7 @@ class DQN:
         self.minibatch_size = self.agent_config.minibatch_size
         self.tau = self.agent_config.tau
         self.gamma = self.agent_config.gamma
-        self.learn_frequency = self.agent_config.learn_frequency
+        self.learn_every = self.agent_config.learn_every
         self.epsilon = self.agent_config.epsilon
         self.eps_final = self.agent_config.eps_final
         self.eps_decay = self.agent_config.eps_decay
@@ -426,9 +543,11 @@ class DQN:
         Initializes training settings from the configuration.
         """
 
+        self.env_id = self.training_config.env_id
         self.n_timesteps = self.training_config.n_timesteps
+        self.evaluate_every = self.training_config.evaluate_every
         self.score_threshold = self.training_config.score_threshold
-        self.scores_window_size = self.training_config.scores_window_size
+        self.window_size = self.training_config.scores_window_size
         self.max_timesteps_per_episode = self.training_config.max_timesteps_per_episode
         self.checkpoint_frequency = self.training_config.checkpoint_frequency
         self.print_every = self.training_config.print_every

@@ -13,7 +13,7 @@ class DQNConfig:
         minibatch_size (int): Size of the minibatch used in the learning process.
         tau (float): Interpolation parameter for updating the target network.
         gamma (float): Discount factor for future rewards.
-        learn_frequency (int): Number of steps between each learning.
+        learn_every (int): Number of steps between each learning.
         epsilon (float): Initial value for the epsilon in the epsilon-greedy policy.
         eps_final (float): Final value of epsilon.
         eps_decay (float): Decay rate of epsilon per episode.
@@ -25,7 +25,7 @@ class DQNConfig:
     minibatch_size: int = 64
     tau: float = 1e-3
     gamma: float = 0.99
-    learn_frequency: int = 1
+    learn_every: int = 1
     epsilon: float = 1.0
     eps_final: float = 0.01
     eps_decay: float = 0.995

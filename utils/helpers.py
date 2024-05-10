@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Tuple
 
 
-def nice_box(width: int, contents: Optional[List[Tuple[str, Optional[str]]]] = None, margin: int = 2,
+def nice_box(width: int, contents: Optional[List[Tuple[str, Optional[str]]]] = None, margin: int = 2, padding: int = 0,
              thick: bool = False, upper: bool = True, lower: bool = True, sides: bool = True) -> str:
     """
     Creates a nice decorative text box with the following options:
@@ -12,6 +12,7 @@ def nice_box(width: int, contents: Optional[List[Tuple[str, Optional[str]]]] = N
             Each string can optionally have a second element specifying alignment 
             ('c' for center, 'r' for right, default is left). Defaults to None.
         margin (int, optional): The margin size around the contents. Defaults to 2.
+        padding (int, optional): The padding left of the text box. Defaults to 0.
         thick (bool, optional): Boolean, determines if thick or thin box characters are used. Defaults to False.
         upper (bool, optional): Boolean, controls if the top border is drawn. Defaults to True.
         lower (bool, optional): Boolean, controls if the bottom border is drawn. Defaults to True.
@@ -44,8 +45,8 @@ def nice_box(width: int, contents: Optional[List[Tuple[str, Optional[str]]]] = N
 
     if upper:
         # Add top border
-        box_str += (box_char['TL'] if sides else ' ') + \
-            box_char['H'] * width + (box_char['TR'] if sides else ' ')
+        box_str += ' ' * padding + (box_char['TL'] if sides else ' ') \
+            + box_char['H'] * width + (box_char['TR'] if sides else ' ')
 
     for content in contents:
         if not isinstance(content, tuple) or len(content) != 2 or \
@@ -67,12 +68,12 @@ def nice_box(width: int, contents: Optional[List[Tuple[str, Optional[str]]]] = N
                 text = text.ljust(inner_width)
 
         # Build the content string with margins and vertical bar
-        box_str += '\n' + (box_char['V'] if sides else ' ') + ' ' * \
-            margin + text + ' ' * margin + (box_char['V'] if sides else ' ')
+        box_str += '\n' + ' ' * padding + (box_char['V'] if sides else ' ') \
+            + ' ' * margin + text + ' ' * margin + (box_char['V'] if sides else ' ')
 
     if lower:
         # Add bottom border
-        box_str += '\n' + (box_char['BL'] if sides else ' ') + \
-            box_char['H'] * width + (box_char['BR'] if sides else ' ')
+        box_str += '\n' + ' ' * padding + (box_char['BL'] if sides else ' ') \
+            + box_char['H'] * width + (box_char['BR'] if sides else ' ')
 
     return box_str
