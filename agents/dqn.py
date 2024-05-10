@@ -190,7 +190,7 @@ class DQN:
                 str1 = f'Environment solved on timestep {self.t}!'
                 str1 = str1.center(88)
                 if self.print_every > 0:
-                    print(f'\n{str1}')
+                    print(f'\n{str1}', end='')
                 break
 
         # Final evaluation
@@ -207,7 +207,7 @@ class DQN:
             if average_evaluation_return is not None:
                 str3 = f'Evaluation Return: {average_evaluation_return:.3f}'
             str4 = f'Number of Episodes: {self.episode_i}'
-            print(f'    {str2}  |  {str3}  |  {str4}')
+            print(f'\n    {str2}  |  {str3}  |  {str4}')
 
         # Final save and close the logger
         if self.checkpoint_frequency > 0:
