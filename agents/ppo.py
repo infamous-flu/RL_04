@@ -130,110 +130,6 @@ class PPO:
         self._init_hyperparameters()                          # Initialize the hyperparameters
         self._init_network()                                  # Set up the neural network architecture
 
-    def evaluate(self, evaluation_config: EvaluationConfig) -> float:
-        """
-        Evaluate the agent based on the given configuration.
-
-        Args:
-            evaluation_config (EvaluationConfig): Configuration object containing evaluation parameters.
-
-        Returns:
-            float: Average return across all evaluation episodes.
-        """
-
-        def extract_timestamp() -> str:
-            """Extract the first timestamp from any of the provided paths or generate a new one."""
-
-            timestamp_pattern = r'\d{8}\-\d{6}|\d{8}\d{6}'
-
-            # Attempt to extract the timestamp from agent attributes
-            for attr in ['log_dir', 'save_path']:
-                if hasattr(self, attr):
-                    value = getattr(self, attr, None)
-                    if value:
-                        match = re.search(timestamp_pattern, value)
-                        if match:
-                            return match.group(0)
-
-            # Fallback to a new timestamp if no match is found
-            return datetime.now().strftime('%Y%m%d%H%M%S')
-
-        # Save the current random states to avoid interference
-        random_state = random.getstate()
-        np_random_state = np.random.get_state()
-        torch_random_state = torch.get_rng_state()
-
-        try:
-            # Generate seed if it's not specified
-            if evaluation_config.seed is None:
-                evaluation_config.seed = int(time.time() * 1000) % (2 ** 32 - 1)
-
-            # Calculate the initial seed for this evaluation
-            eval_seed = evaluation_config.seed + self.t // 10000
-
-            # Set seeds for reproducibility
-            random.seed(eval_seed)
-            np.random.seed(eval_seed)
-            torch.manual_seed(eval_seed)
-
-            # Generate default video folder if not provided
-            if evaluation_config.video_folder is None:
-                timestamp = extract_timestamp()
-                video_folder = os.path.join('recordings', self.env_id, 'ppo', timestamp)
-
-            # Generate default name prefix if not provided
-            if evaluation_config.name_prefix is None:
-                name_prefix = f'timestep-{self.t:07d}'
-            else:
-                name_prefix = evaluation_config.name_prefix
-
-            # Create the evaluation environment
-            eval_env = gym.make(self.env_id, render_mode='rgb_array', **evaluation_config.kwargs)
-
-            # Enable video recording if specified
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore', category=UserWarning)
-                if evaluation_config.record_every > 0:
-                    eval_env = RecordVideo(
-                        eval_env,
-                        video_folder=video_folder,
-                        name_prefix=name_prefix,
-                        episode_trigger=lambda x: x % evaluation_config.record_every == 0,
-                        disable_logger=True
-                    )
-
-            returns = []
-
-            # Evaluate the agent over a specified number of episodes
-            for episode in range(evaluation_config.n_episodes):
-                episode_return = 0
-                observation, _ = eval_env.reset(seed=eval_seed)
-                done = False
-                for _ in range(self.max_timesteps_per_episode):
-                    action = self.select_action(
-                        observation, deterministic=evaluation_config.deterministic
-                    )
-                    observation, reward, terminated, truncated, _ = eval_env.step(action)
-                    episode_return += reward
-                    done = terminated or truncated
-                    if done:
-                        break
-                returns.append(episode_return)
-                eval_seed += 1  # Increment the seed for the next episode
-
-            eval_env.close()
-
-        finally:
-            # Restore the original random states to ensure no training impact
-            random.setstate(random_state)
-            np.random.set_state(np_random_state)
-            torch.set_rng_state(torch_random_state)
-
-        # Compute the average return across all episodes
-        average_evaluation_return = sum(returns) / evaluation_config.n_episodes
-
-        return average_evaluation_return
-
     def learn(self, training_config: TrainingConfig, evaluation_config: Optional[EvaluationConfig] = None):
         """
         Train the PPO agent using the given training configuration and optionally evaluate during training.
@@ -582,6 +478,110 @@ class PPO:
             advantages.extend(episode_advantages)  # Extend the main advantages with the current episode's
 
         return advantages
+
+    def evaluate(self, evaluation_config: EvaluationConfig) -> float:
+        """
+        Evaluate the agent based on the given configuration.
+
+        Args:
+            evaluation_config (EvaluationConfig): Configuration object containing evaluation parameters.
+
+        Returns:
+            float: Average return across all evaluation episodes.
+        """
+
+        def extract_timestamp() -> str:
+            """Extract the first timestamp from any of the provided paths or generate a new one."""
+
+            timestamp_pattern = r'\d{8}\-\d{6}|\d{8}\d{6}'
+
+            # Attempt to extract the timestamp from agent attributes
+            for attr in ['log_dir', 'save_path']:
+                if hasattr(self, attr):
+                    value = getattr(self, attr, None)
+                    if value:
+                        match = re.search(timestamp_pattern, value)
+                        if match:
+                            return match.group(0)
+
+            # Fallback to a new timestamp if no match is found
+            return datetime.now().strftime('%Y%m%d%H%M%S')
+
+        # Save the current random states to avoid interference
+        random_state = random.getstate()
+        np_random_state = np.random.get_state()
+        torch_random_state = torch.get_rng_state()
+
+        try:
+            # Generate seed if it's not specified
+            if evaluation_config.seed is None:
+                evaluation_config.seed = int(time.time() * 1000) % (2 ** 32 - 1)
+
+            # Calculate the initial seed for this evaluation
+            eval_seed = evaluation_config.seed + self.t // 10000
+
+            # Set seeds for reproducibility
+            random.seed(eval_seed)
+            np.random.seed(eval_seed)
+            torch.manual_seed(eval_seed)
+
+            # Generate default video folder if not provided
+            if evaluation_config.video_folder is None:
+                timestamp = extract_timestamp()
+                video_folder = os.path.join('recordings', self.env_id, 'ppo', timestamp)
+
+            # Generate default name prefix if not provided
+            if evaluation_config.name_prefix is None:
+                name_prefix = f'timestep-{self.t:07d}'
+            else:
+                name_prefix = evaluation_config.name_prefix
+
+            # Create the evaluation environment
+            eval_env = gym.make(self.env_id, render_mode='rgb_array', **evaluation_config.kwargs)
+
+            # Enable video recording if specified
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', category=UserWarning)
+                if evaluation_config.record_every > 0:
+                    eval_env = RecordVideo(
+                        eval_env,
+                        video_folder=video_folder,
+                        name_prefix=name_prefix,
+                        episode_trigger=lambda x: x % evaluation_config.record_every == 0,
+                        disable_logger=True
+                    )
+
+            returns = []
+
+            # Evaluate the agent over a specified number of episodes
+            for episode in range(evaluation_config.n_episodes):
+                episode_return = 0
+                observation, _ = eval_env.reset(seed=eval_seed)
+                done = False
+                for _ in range(self.max_timesteps_per_episode):
+                    action = self.select_action(
+                        observation, deterministic=evaluation_config.deterministic
+                    )
+                    observation, reward, terminated, truncated, _ = eval_env.step(action)
+                    episode_return += reward
+                    done = terminated or truncated
+                    if done:
+                        break
+                returns.append(episode_return)
+                eval_seed += 1  # Increment the seed for the next episode
+
+            eval_env.close()
+
+        finally:
+            # Restore the original random states to ensure no training impact
+            random.setstate(random_state)
+            np.random.set_state(np_random_state)
+            torch.set_rng_state(torch_random_state)
+
+        # Compute the average return across all episodes
+        average_evaluation_return = sum(returns) / evaluation_config.n_episodes
+
+        return average_evaluation_return
 
     def is_environment_solved(self):
         """

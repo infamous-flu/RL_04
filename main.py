@@ -82,7 +82,7 @@ def main():
             agent_config = PPOConfig()
 
     # Set up the training configuration
-    training_seed = 73             # Seed for training reproducibility
+    training_seed = 1              # Seed for training reproducibility
     training_timesteps = int(1e6)  # Number of timesteps for training
 
     training_config = TrainingConfig(
