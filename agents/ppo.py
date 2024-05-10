@@ -217,7 +217,7 @@ class PPO:
         observations, actions, log_probs, rewards, values, dones = [], [], [], [], [], []
 
         while batch_t < self.max_timesteps_per_batch:
-            score = 0                                                    # Initialize score for the episode
+            episode_return = 0                                           # Initialize return for the episode
             episode_rewards, episode_values, episode_dones = [], [], []
             observation, _ = self.env.reset()                            # Reset the environment and get the initial observation
             done = False
@@ -230,7 +230,7 @@ class PPO:
                 next_observation, reward, terminated, truncated, _ = self.env.step(action)  # Take the action
                 done = terminated or truncated                                              # Determine if the episode has ended
 
-                score += reward                   # Update the score
+                episode_return += reward          # Update the episode return
                 observations.append(observation)
                 actions.append(action)
                 log_probs.append(log_prob)
@@ -267,9 +267,9 @@ class PPO:
             values.append(episode_values)
             dones.append(episode_dones)
 
-            self.episode_i += 1                        # Increment the episode counter
-            self.returns_window.append(score)          # Record the score
-            self.lengths_window.append(episode_t + 1)  # Record the length
+            self.episode_i += 1                         # Increment the episode counter
+            self.returns_window.append(episode_return)  # Record the episode return
+            self.lengths_window.append(episode_t + 1)   # Record the episode length
 
             # Print when 'conventional' threshold first reached
             if self.print_every > 0 and self.episode_i >= self.window_size \
@@ -282,7 +282,7 @@ class PPO:
                 if self.episode_i >= self.window_size:
                     self.writer.add_scalar('Common/AverageTrainingReturn', np.mean(self.returns_window), self.t)  # Log the average return
                     self.writer.add_scalar('Common/AverageEpisodeLength', np.mean(self.lengths_window), self.t)   # Log the average episode length
-                self.writer.add_scalar('Common/EpisodeReturn', score, self.episode_i)                             # Log the episode return
+                self.writer.add_scalar('Common/EpisodeReturn', episode_return, self.episode_i)                    # Log the episode return
                 self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)                     # Log the episode length
 
             # Stop the rollout if environment is considered solved
@@ -529,6 +529,8 @@ class PPO:
             if evaluation_config.video_folder is None:
                 timestamp = extract_timestamp()
                 video_folder = os.path.join('recordings', self.env_id, 'ppo', timestamp)
+            else:
+                video_folder = evaluation_config.video_folder
 
             # Generate default name prefix if not provided
             if evaluation_config.name_prefix is None:

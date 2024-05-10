@@ -221,7 +221,7 @@ class DQN:
         and training the Q network.
         """
 
-        score = 0                          # Initialize score for the episode
+        episode_return = 0                 # Initialize return for the episode
         observation, _ = self.env.reset()  # Reset the environment and get the initial observation
 
         for episode_t in range(self.max_timesteps_per_episode):                         # Iterate over allowed timesteps
@@ -230,8 +230,8 @@ class DQN:
             next_observation, reward, terminated, truncated, _ = self.env.step(action)  # Take the action
             done = terminated or truncated                                              # Determine if the episode has ended
 
-            score += reward                                                        # Update the score
-            self.memory.push(observation, action, next_observation, reward, done)  # Remember the experience
+            episode_return += reward                                                    # Update the episode return
+            self.memory.push(observation, action, next_observation, reward, done)       # Remember the experience
 
             # Update the Q-Network using the collected experiences
             if self.t >= self.learning_starts and self.t % self.learn_every == 0:
@@ -265,9 +265,9 @@ class DQN:
 
         self.epsilon = max(self.epsilon * self.eps_decay, self.eps_final)  # Update the exploration rate
 
-        self.episode_i += 1                        # Increment the episode counter
-        self.returns_window.append(score)          # Record the score
-        self.lengths_window.append(episode_t + 1)  # Record the length
+        self.episode_i += 1                         # Increment the episode counter
+        self.returns_window.append(episode_return)  # Record the episode return
+        self.lengths_window.append(episode_t + 1)   # Record the episode length
 
         # Print when 'conventional' threshold first reached
         if self.print_every > 0 and len(self.returns_window) == self.window_size \
@@ -280,7 +280,7 @@ class DQN:
             if self.episode_i >= self.window_size:
                 self.writer.add_scalar('Common/AverageTrainingReturn', np.mean(self.returns_window), self.t)  # Log the average return
                 self.writer.add_scalar('Common/AverageEpisodeLength', np.mean(self.lengths_window), self.t)   # Log the average episode length
-            self.writer.add_scalar('Common/EpisodeReturn', score, self.episode_i)                             # Log the episode return
+            self.writer.add_scalar('Common/EpisodeReturn', episode_return, self.episode_i)                    # Log the episode return
             self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)                     # Log the episode length
             self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)                               # Log the exploration rate
 
@@ -304,7 +304,7 @@ class DQN:
         # Compute current Q-values from policy network for the actions taken
         current_q_values = self.policy_net(observations).gather(1, actions.unsqueeze(1)).squeeze(-1)
 
-        # Compute target Q-values from target network for next observations
+        # Compute maximum Q-values from target network for next observations
         with torch.no_grad():
             max_q_values, _ = self.target_net(next_observations).max(dim=1)
 
@@ -410,6 +410,8 @@ class DQN:
             if evaluation_config.video_folder is None:
                 timestamp = extract_timestamp()
                 video_folder = os.path.join('recordings', self.env_id, 'dqn', timestamp)
+            else:
+                video_folder = evaluation_config.video_folder
 
             # Generate default name prefix if not provided
             if evaluation_config.name_prefix is None:
