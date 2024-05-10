@@ -58,4 +58,4 @@ class PPOConfig:
     clip_range: float = 0.2
     normalize_advantage: bool = True
     value_coef: float = 0.5
-    entropy_coef: float = 1e-3
+    entropy_coef: float = 0.01
