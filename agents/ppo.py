@@ -162,7 +162,7 @@ class PPO:
         self.threshold_reached = False                            # Track if 'conventional' threshold is reached
 
         while self.t < self.n_timesteps:
-            observations, actions, log_probs, rewards, values, dones = self.rollout()  # Collect a batch of trajectories
+            observations, actions, log_probs, rewards, values = self.rollout()  # Collect a batch of trajectories
 
             # Check for early stopping if the environment is considered solved
             if self.is_environment_solved():
@@ -173,7 +173,7 @@ class PPO:
                 break
 
             # Learn using the collected batch of trajectories
-            self.train(observations, actions, log_probs, rewards, values, dones)
+            self.train(observations, actions, log_probs, rewards, values)
 
         # Final evaluation
         if self.evaluate_every > 0:
@@ -197,8 +197,8 @@ class PPO:
         if self.writer is not None:
             self.writer.close()
 
-    def rollout(self) -> Tuple[List[np.ndarray], List[int], List[torch.Tensor],
-                               List[List[float]], List[List[torch.Tensor]], List[List[bool]]]:
+    def rollout(self) -> Tuple[List[np.ndarray], List[int], List[torch.Tensor], List[List[float]],
+                               List[List[torch.Tensor]]]:
         """
         Executes one rollout to collect training data until a batch of trajectories is filled
         or the environment is considered solved.
@@ -210,22 +210,20 @@ class PPO:
             - log probabilities (List[torch.Tensor]): Log probabilities of the actions taken.
             - rewards (List[List[float]]): Rewards received after taking actions.
             - values (List[List[torch.Tensor]]): Estimated values after taking actions.
-            - dones (List[List[bool]]): Boolean flags indicating if an episode has ended.
         """
 
         batch_t = 0  # Initialize batch timestep counter
-        observations, actions, log_probs, rewards, values, dones = [], [], [], [], [], []
+        observations, actions, log_probs, rewards, values = [], [], [], [], []
 
         while batch_t < self.max_timesteps_per_batch:
             episode_return = 0                                           # Initialize return for the episode
-            episode_rewards, episode_values, episode_dones = [], [], []
+            episode_rewards, episode_values = [], []
             observation, _ = self.env.reset()                            # Reset the environment and get the initial observation
             done = False
 
             for episode_t in range(self.max_timesteps_per_episode):      # Iterate over allowed timesteps
                 self.t += 1                                              # Increment the global timestep counter
                 batch_t += 1                                             # Increment the batch timestep counter
-                episode_dones.append(done)
                 action, log_prob, V = self.select_action(observation)                       # Select an action
                 next_observation, reward, terminated, truncated, _ = self.env.step(action)  # Take the action
                 done = terminated or truncated                                              # Determine if the episode has ended
@@ -265,7 +263,6 @@ class PPO:
 
             rewards.append(episode_rewards)
             values.append(episode_values)
-            dones.append(episode_dones)
 
             self.episode_i += 1                         # Increment the episode counter
             self.returns_window.append(episode_return)  # Record the episode return
@@ -289,10 +286,10 @@ class PPO:
             if self.is_environment_solved():
                 break
 
-        return observations, actions, log_probs, rewards, values, dones
+        return observations, actions, log_probs, rewards, values
 
     def train(self, observations: List[np.ndarray], actions: List[int], log_probs: List[torch.Tensor],
-              rewards: List[List[float]], values: List[List[torch.Tensor]], dones: List[List[bool]]):
+              rewards: List[List[float]], values: List[List[torch.Tensor]]):
         """
         Performs a learning update using the Proximal Policy Optimization (PPO) algorithm.
 
@@ -302,11 +299,10 @@ class PPO:
             log probabilities (List[torch.Tensor]): Log probabilities of the actions taken.
             rewards (List[List[float]]): Lists of rewards received after taking actions.
             values (List[List[torch.Tensor]]): Lists of estimated values after taking actions.
-            dones (List[List[bool]]): Lists of boolean flags indicating if an episode has ended.
         """
 
         # Calculate the advantage estimates using Generalized Advantage Estimation (GAE)
-        advantages = self.calculate_gae(rewards, values, dones)
+        advantages = self.calculate_gae(rewards, values)
 
         # Prepare the data by converting to PyTorch tensors for neural network processing
         observations, actions, log_probs, advantages = \
@@ -439,15 +435,13 @@ class PPO:
         log_probs = dist.log_prob(actions)             # Calculate the log probabilities of the actions
         return V.squeeze(), log_probs, dist.entropy()
 
-    def calculate_gae(self, rewards: List[List[float]], values: List[List[torch.Tensor]],
-                      dones: List[List[bool]]) -> List[torch.Tensor]:
+    def calculate_gae(self, rewards: List[List[float]], values: List[List[torch.Tensor]]) -> List[torch.Tensor]:
         """
-        Calculates the Generalized Advantage Estimation (GAE) for a set of rewards, values, and done signals.
+        Calculates the Generalized Advantage Estimation (GAE) for a set of rewards and values.
 
         Args:
             rewards (List[List[float]]): Rewards obtained from the environment.
             values (List[List[torch.Tensor]]): Value estimates from the critic.
-            dones (List[List[bool]]): Done signals indicating the end of an episode.
 
         Returns:
             List[torch.Tensor]: The list of advantage estimates.
@@ -455,8 +449,8 @@ class PPO:
 
         advantages = []  # List to store the computed advantages for the batch
 
-        # Iterate through each episode's rewards, values, and done signals
-        for episode_rewards, episode_values, episode_dones in zip(rewards, values, dones):
+        # Iterate through each episode's rewards, amd values.
+        for episode_rewards, episode_values in zip(rewards, values):
             episode_advantages = []  # List to store the current episode's advantages
             last_advantage = 0       # Initialize the last advantage to zero
 
@@ -464,14 +458,13 @@ class PPO:
             for i in reversed(range(len(episode_rewards))):
                 if i + 1 < len(episode_rewards):
                     # Compute the temporal difference (delta) for the current step
-                    delta = episode_rewards[i] + self.gamma * \
-                        episode_values[i+1] * (1 - episode_dones[i+1]) - episode_values[i]
+                    delta = episode_rewards[i] + self.gamma * episode_values[i+1] - episode_values[i]
                 else:
                     # Compute the difference between the reward and current value for the last step
                     delta = episode_rewards[i] - episode_values[i]
 
                 # Compute the advantage value using the GAE formula
-                advantage = delta + self.gamma * self.gae_lambda * (1 - episode_dones[i]) * last_advantage
+                advantage = delta + self.gamma * self.gae_lambda * last_advantage
                 last_advantage = advantage               # Update the last advantage for the next timestep
                 episode_advantages.insert(0, advantage)  # Insert at the front of the list
 
