@@ -26,7 +26,7 @@ class BaseExperimentConfig:
     kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TrainingConfig(BaseExperimentConfig):
     """
     Configuration class for training reinforcement learning agents.
@@ -37,7 +37,7 @@ class TrainingConfig(BaseExperimentConfig):
         device (torch.device): The computation device, either CPU or GPU (CUDA), based on system availability.
         kwargs (Dict[str, Any]): Additional keyword arguments for gym environment customization.
         seed (Optional[int]): A global random seed for reproducibility. Defaults to `None`, which generates a seed.
-        n_timesteps (int): The total number of timesteps for training. Must be positive.
+        n_timesteps (int): The total number of timesteps for training. Must be positive. This is a required field.
         evaluate_every (int): The interval at which evaluation is performed during training, in timesteps.
                               If non-positive, evaluation is disabled.
         score_threshold (int): The score threshold to define when the environment is considered solved.
@@ -50,7 +50,7 @@ class TrainingConfig(BaseExperimentConfig):
         save_path (Optional[str]): Path to save the model. If not provided, a default path is generated.
     """
 
-    n_timesteps: int = int(3e5)
+    n_timesteps: int
     evaluate_every: int = 10000
     score_threshold: int = 200
     window_size: int = 100
@@ -90,7 +90,7 @@ class TrainingConfig(BaseExperimentConfig):
             os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EvaluationConfig(BaseExperimentConfig):
     """
     Configuration class for evaluation settings.

@@ -164,15 +164,15 @@ class DQN:
             raise ValueError('Evaluation configuration is required because `evaluate_every` is set.')
 
         if training_config.env_id != evaluation_config.env_id:
-            raise ValueError(f'Training and evaluation environment IDs do not match.')
+            raise ValueError('Training and evaluation environment IDs do not match.')
 
         if training_config.agent_type != evaluation_config.agent_type:
-            raise ValueError(f'Training and evaluation agent types do not match.')
+            raise ValueError('Training and evaluation agent types do not match.')
 
-        self.training_config = training_config
+        self.training_config = training_config                    # Configuration for training parameters
         if evaluation_config is not None:
-            self.evaluation_config = evaluation_config
-        self._init_training_settings()                            # Initialize training parameters
+            self.evaluation_config = evaluation_config            # Configuration for evaluation parameters
+        self._init_training_parameters()                          # Initialize training parameters
         self._set_seed(self.training_config.seed)                 # Set the seed in various components
         self._init_writer()                                       # Prepare the TensorBoard writer for logging
 
@@ -206,8 +206,10 @@ class DQN:
             str2 = f'Training Return: {np.mean(self.returns_window):.3f}'
             if average_evaluation_return is not None:
                 str3 = f'Evaluation Return: {average_evaluation_return:.3f}'
+            else:
+                str3 = None
             str4 = f'Number of Episodes: {self.episode_i}'
-            print(f'\n    {str2}  |  {str3}  |  {str4}')
+            print(f'\n    {str2}  ' + (f'|  {str3}  ' if str3 else '') + f'|  {str4}')
 
         # Final save and close the logger
         if self.checkpoint_frequency > 0:
@@ -278,11 +280,13 @@ class DQN:
 
         if self.enable_logging:
             if self.episode_i >= self.window_size:
-                self.writer.add_scalar('Common/AverageTrainingReturn', np.mean(self.returns_window), self.t)  # Log the average return
-                self.writer.add_scalar('Common/AverageEpisodeLength', np.mean(self.lengths_window), self.t)   # Log the average episode length
-            self.writer.add_scalar('Common/EpisodeReturn', episode_return, self.episode_i)                    # Log the episode return
-            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)                     # Log the episode length
-            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)                               # Log the exploration rate
+                self.writer.add_scalar(
+                    'Common/AverageTrainingReturn', np.mean(self.returns_window), self.t)   # Log the average return
+                self.writer.add_scalar(
+                    'Common/AverageEpisodeLength', np.mean(self.lengths_window), self.t)    # Log the average episode length
+            self.writer.add_scalar('Common/EpisodeReturn', episode_return, self.episode_i)  # Log the episode return
+            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)   # Log the episode length
+            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)             # Log the exploration rate
 
     def train(self):
         """
@@ -563,9 +567,9 @@ class DQN:
         self.eps_final = self.agent_config.eps_final
         self.eps_decay = self.agent_config.eps_decay
 
-    def _init_training_settings(self):
+    def _init_training_parameters(self):
         """
-        Initializes training settings from the configuration.
+        Initializes training parameters from the configuration.
         """
 
         self.env_id = self.training_config.env_id
@@ -574,10 +578,10 @@ class DQN:
         self.score_threshold = self.training_config.score_threshold
         self.window_size = self.training_config.window_size
         self.max_timesteps_per_episode = self.training_config.max_timesteps_per_episode
-        self.checkpoint_frequency = self.training_config.checkpoint_frequency
         self.print_every = self.training_config.print_every
         self.enable_logging = self.training_config.enable_logging
         self.log_dir = self.training_config.log_dir
+        self.checkpoint_frequency = self.training_config.checkpoint_frequency
         self.save_path = self.training_config.save_path
 
     def _init_networks(self):
