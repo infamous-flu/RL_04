@@ -31,7 +31,7 @@ class DQNConfig:
     eps_decay: float = 0.995
 
 
-@ dataclass
+@dataclass
 class PPOConfig:
     """
     Configuration class for PPO agent settings.
