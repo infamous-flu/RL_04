@@ -99,7 +99,7 @@ def main(args):
     )
 
     # Set up the evaluation configuration
-    evaluation_seed = 110                  # Fixed seed value for evaluation
+    evaluation_seed = 69420                # Fixed seed value for evaluation
     evaluation_episodes = 10               # Number of episodes for evaluation
 
     evaluation_config = EvaluationConfig(
