@@ -85,7 +85,7 @@ class TrainingConfig(BaseExperimentConfig):
             self.log_dir = os.path.join('runs', self.env_id, self.agent_type, timestamp)
 
         # Generate default model saving path if not provided
-        if self.save_path is None:
+        if self.checkpoint_frequency > 0 and self.save_path is None:
             self.save_path = os.path.join('saved_models', self.env_id, self.agent_type, f'model_{timestamp}.pth')
             os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
 
