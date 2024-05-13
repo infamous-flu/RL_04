@@ -103,10 +103,10 @@ class PPO:
     A class implementing the Proximal Policy Optimization (PPO) reinforcement learning algorithm.
 
     Attributes:
-        env (gym.Env): The environment in which the agent operates.
-        device (torch.device): The device (CPU or GPU) on which the computations are performed.
-        agent_config (DQNConfig): The agent-specific configuration settings.
-        seed (Optional[int]): Seed value for initialization.
+        env (gym.Env): The gym environment in which the agent will operate.
+        device (torch.device): The device (CPU or GPU) to perform computations.
+        agent_config (DQNConfig): Configuration object containing hyperparameters for the PPO agent.
+        seed (Optional[int]): Optional seed value for initialization to ensure reproducibility.
     """
 
     def __init__(self, env: gym.Env, device: torch.device, agent_config: PPOConfig, seed: Optional[int] = None):
@@ -114,10 +114,10 @@ class PPO:
         Initializes the PPO agent with the environment, device, and configuration.
 
         Args:
-            env (gym.Env): The gym environment.
+            env (gym.Env): The gym environment in which the agent will operate.
             device (torch.device): The device (CPU or GPU) to perform computations.
-            agent_config (DQNConfig): The agent-specific configuration settings.
-            seed (Optional[int]): Seed value for initialization.
+            agent_config (DQNConfig): Configuration object containing hyperparameters for the PPO agent.
+            seed (Optional[int]): Optional seed value for initialization to ensure reproducibility.
         """
 
         self.env = env                                        # The gym environment where the agent will interact
@@ -132,11 +132,16 @@ class PPO:
 
     def learn(self, training_config: TrainingConfig, evaluation_config: Optional[EvaluationConfig] = None):
         """
-        Train the PPO agent using the given training configuration and optionally evaluate during training.
+        Train the PPO agent using the given training configuration and optionally evaluate during training. 
+        Raises errors if evaluation is required by the training configuration but not provided, or if there
+        are mismatches in environment IDs or agent types between training and evaluation configurations.
 
         Args:
-            training_config (TrainingConfig): The configuration containing training parameters.
-            evaluation_config (Optional[EvaluationConfig]): Optional configuration for evaluation parameters.
+            training_config (TrainingConfig): The configuration containing training parameters such as the
+            number of timesteps, the environment ID, the agent type, and the seed.
+            evaluation_config (Optional[EvaluationConfig]): Optional configuration for evaluation parameters
+            which includes settings like the environment ID and the agent type. Necessary if `evaluate_every`
+            is set in the training configuration.
         """
 
         if training_config.evaluate_every > 0 and evaluation_config is None:
@@ -149,7 +154,7 @@ class PPO:
             raise ValueError('Training and evaluation agent types do not match.')
 
         self.training_config = training_config                    # Configuration for training parameters
-        if evaluation_config is not None:
+        if evaluation_config:
             self.evaluation_config = evaluation_config            # Configuration for evaluation parameters
         self._init_training_parameters()                          # Initialize training parameters
         self._set_seed(self.training_config.seed)                 # Set the seed in various components
@@ -199,19 +204,21 @@ class PPO:
         if self.writer is not None:
             self.writer.close()
 
-    def rollout(self) -> Tuple[List[np.ndarray], List[int], List[torch.Tensor], List[List[float]],
-                               List[List[torch.Tensor]]]:
+    def rollout(self) -> Tuple[List[NDArray[np.float32]], List[int], List[torch.Tensor],
+                               List[List[float]], List[List[torch.Tensor]]]:
         """
         Executes one rollout to collect training data until a batch of trajectories is filled
-        or the environment is considered solved.
+        or the environment is considered solved. This method captures the sequence of observations,
+        actions, corresponding log probabilities of actions, rewards, and estimated values from the
+        environment until the specified batch size is reached or a termination condition is met.
 
         Returns:
             A tuple containing:
-            - observations (List[np.ndarray]): The environment's states observed by the agent.
+            - observations (List[NDArray[np.float32]]): States observed by the agent during the rollout.
             - actions (List[int]): Actions taken by the agent.
             - log probabilities (List[torch.Tensor]): Log probabilities of the actions taken.
-            - rewards (List[List[float]]): Rewards received after taking actions.
-            - values (List[List[torch.Tensor]]): Estimated values after taking actions.
+            - rewards (List[List[float]]): Nested list of rewards received.
+            - values (List[List[torch.Tensor]]): Nested list of value estimates.
         """
 
         batch_t = 0  # Initialize batch timestep counter
@@ -292,17 +299,25 @@ class PPO:
 
         return observations, actions, log_probs, rewards, values
 
-    def train(self, observations: List[np.ndarray], actions: List[int], log_probs: List[torch.Tensor],
-              rewards: List[List[float]], values: List[List[torch.Tensor]]):
+    def train(self, observations: List[NDArray[np.float32]], actions: List[int],
+              log_probs: List[torch.Tensor], rewards: List[List[float]],
+              values: List[List[torch.Tensor]]):
         """
-        Performs a learning update using the Proximal Policy Optimization (PPO) algorithm.
+        Performs a learning update using the Proximal Policy Optimization (PPO) algorithm. This method applies
+        Generalized Advantage Estimation (GAE) to compute advantage estimates and subsequently performs several
+        epochs of minibatch updates on shuffled data to optimize the policy and value functions.
 
         Args:
-            observations (List[np.ndarray]): The environment's states observed by the agent.
+            observations (List[NDArray[np.float32]]): States observed by the agent.
             actions (List[int]): Actions taken by the agent.
-            log probabilities (List[torch.Tensor]): Log probabilities of the actions taken.
-            rewards (List[List[float]]): Lists of rewards received after taking actions.
-            values (List[List[torch.Tensor]]): Lists of estimated values after taking actions.
+            log probabilities (List[torch.Tensor]): Log probabilities of the actions at the time they were taken.
+            rewards (List[List[float]]): Nested list of rewards received.
+            values (List[List[torch.Tensor]]): Nested list of value estimates.
+
+        This method updates the policy by performing several passes over the data, using minibatch SGD to find an
+        optimal update that minimizes the policy loss while maximizing expected returns as dictated by PPO's
+        clipped objective. It also logs various metrics such as policy loss, value loss, and entropy to monitor
+        training progress.
         """
 
         # Calculate the advantage estimates using Generalized Advantage Estimation (GAE)
@@ -387,10 +402,13 @@ class PPO:
     def select_action(self, observation: NDArray[np.float32], deterministic: bool = False):
         """
         Selects an action based on the current observation using the policy defined by the actor-critic network.
+        This method supports both deterministic and stochastic action selections depending on the mode specified.
+        Deterministic selection chooses the action with the highest probability, suitable for evaluation,
+        while stochastic selection samples from the policy distribution, suitable for exploration during training.
 
         Args:
             observation (NDArray[np.float32]): The current state observation from the environment.
-            deterministic (bool): If True, the action choice is deterministic (the max probability action).
+            deterministic (bool): If True, the action choice is deterministic (the max probability action). \
                                   If False, the action is sampled stochastically according to the policy distribution.
 
         Returns:
@@ -420,18 +438,18 @@ class PPO:
     def get_values(self, observations: torch.Tensor, actions: torch.Tensor) \
             -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Evaluates the given observations and actions using the actor-critic network
-        to obtain values, log probabilities, and entropy.
+        Evaluates the given observations and actions using the actor-critic network to obtain values,
+        log probabilities, and entropy of the policy distribution.
 
         Args:
-            observations (torch.Tensor): The batch of observations.
-            actions (torch.Tensor): The batch of actions taken.
+            observations (torch.Tensor): A batch of observations from the environment, formatted as tensors.
+            actions (torch.Tensor): A batch of actions taken by the agent, formatted as tensors.
 
         Returns:
-            A tuple containing:
-                torch.Tensor: The value estimates for the given observations.
-                torch.Tensor: The log probabilities of the taken actions.
-                torch.Tensor: The entropy of the policy distribution.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: 
+                - The value estimates (V) for the given observations from the critic part of the network.
+                - The log probabilities of the actions taken, derived from the actor part of the network.
+                - The entropy of the policy distribution, used to encourage exploration.
         """
 
         logits, V = self.actor_critic(observations)    # Forward pass through the actor-critic network
@@ -441,14 +459,16 @@ class PPO:
 
     def calculate_gae(self, rewards: List[List[float]], values: List[List[torch.Tensor]]) -> List[torch.Tensor]:
         """
-        Calculates the Generalized Advantage Estimation (GAE) for a set of rewards and values.
+        Calculates the Generalized Advantage Estimation (GAE) for a set of rewards and values. GAE is used to
+        reduce the variance of advantage estimates without increasing bias, which is crucial for stable policy
+        updates in PPO.
 
         Args:
-            rewards (List[List[float]]): Rewards obtained from the environment.
-            values (List[List[torch.Tensor]]): Value estimates from the critic.
+            rewards (List[List[float]]): Nested list of rewards obtained from the environment.
+            values (List[List[torch.Tensor]]): Nested list of value estimates from the critic.
 
         Returns:
-            List[torch.Tensor]: The list of advantage estimates.
+            List[torch.Tensor]: The list of advantage estimates, each tensor corresponding to an episode's advantages.
         """
 
         advantages = []  # List to store the computed advantages for the batch
@@ -478,20 +498,21 @@ class PPO:
 
     def evaluate(self, evaluation_config: EvaluationConfig) -> float:
         """
-        Evaluate the agent based on the given configuration.
+        Evaluates the PPO agent by running it through a series of episodes in an evaluation environment,
+        according to the provided configuration. It temporarily alters random states for reproducibility,
+        records evaluation episodes if configured, and safely restores states afterwards.
 
         Args:
             evaluation_config (EvaluationConfig): Configuration object containing evaluation parameters.
 
         Returns:
-            float: Average return across all evaluation episodes.
+            float: Average return across all evaluation episodes, calculated as the sum of rewards obtained per 
+            episode divided by the number of episodes.
         """
 
         def extract_timestamp() -> str:
             """Extract the first timestamp from any of the provided paths or generate a new one."""
-
             timestamp_pattern = r'\d{8}\-\d{6}|\d{8}\d{6}'
-
             # Attempt to extract the timestamp from agent attributes
             for attr in ['log_dir', 'save_path']:
                 if hasattr(self, attr):
@@ -500,7 +521,6 @@ class PPO:
                         match = re.search(timestamp_pattern, value)
                         if match:
                             return match.group(0)
-
             # Fallback to a new timestamp if no match is found
             return datetime.now().strftime('%Y%m%d%H%M%S')
 
@@ -584,10 +604,16 @@ class PPO:
 
     def is_environment_solved(self):
         """
-        Check if the environment is solved.
+        Determines whether the environment is considered solved based on the agent's performance. 
+        The environment is deemed solved if the mean of the returns, minus their standard deviation, 
+        exceeds a predefined threshold. This calculation provides a conservative estimate of the 
+        agent's performance, ensuring consistency over multiple episodes before declaring the 
+        environment solved.
 
         Returns:
-            bool: True if the environment is solved, False otherwise.
+            bool: True if the environment is solved by the above criterion, False otherwise. This
+                requires having a sufficient number of episodes (at least 'window_size') to form
+                a statistically significant assessment.
         """
 
         if len(self.returns_window) < self.window_size:
@@ -597,12 +623,13 @@ class PPO:
 
     def save_model(self, file_path: str, save_optimizer: bool = True):
         """
-        Saves the actor-critic network's model parameters to the specified file path.
-        Optionally, it also saves the optimizer state.
+        Saves the policy network's model parameters to the specified file path. Optionally, it also saves
+        the optimizer state. This function is useful for checkpointing the model during training or saving
+        the final trained model.
 
         Args:
             file_path (str): The path to the file where the model parameters are to be saved.
-            save_optimizer (bool): If True, saves the optimizer state as well. Defaults to False.
+            save_optimizer (bool): If True, saves the optimizer state along with the model parameters.
         """
 
         model_and_or_optim = {'model_state_dict': self.actor_critic.state_dict()}
@@ -612,11 +639,13 @@ class PPO:
 
     def load_model(self, file_path: str, load_optimizer: bool = True):
         """
-        Loads model parameters into the actor-critic network, and optionally loads the optimizer state.
+        Loads model parameters into the policy network from a specified file and also ensures the target
+        network is synchronized with the policy network. Optionally, it can also load the optimizer state
+        if it was saved.
 
         Args:
             file_path (str): The path to the file from which to load the model parameters.
-            load_optimizer (bool): If True, loads the optimizer state as well. Defaults to False.
+            load_optimizer (bool): If True, also loads the optimizer state, assuming it is available.
         """
 
         model_and_or_optim = torch.load(file_path)
@@ -624,7 +653,7 @@ class PPO:
         if load_optimizer and 'optimizer_state_dict' in model_and_or_optim:
             self.optimizer.load_state_dict(model_and_or_optim['optimizer_state_dict'])
 
-    def _prepare_tensors(self, observations: List[np.ndarray], actions: List[int],
+    def _prepare_tensors(self, observations: List[NDArray[np.float32]], actions: List[int],
                          log_probs: List[torch.Tensor], advantages: List[torch.Tensor]) -> \
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """

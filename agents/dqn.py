@@ -20,7 +20,7 @@ from gymnasium.wrappers import RecordVideo
 from config.agents_config import DQNConfig
 from config.experiment_config import TrainingConfig, EvaluationConfig
 
-
+# Defining the Experience namedtuple
 Experience = namedtuple('Experience', ('observation', 'action', 'next_observation', 'reward', 'done'))
 
 
@@ -43,16 +43,21 @@ class ReplayMemory:
 
         self.memory = deque([], maxlen=capacity)
 
-    def push(self, *args: Tuple):
+    def push(self, observation: NDArray[np.float32], action: int,
+             next_observation: NDArray[np.float32], reward: float, done: bool):
         """
-        Adds an experience to the memory. Each experience is expected to be a tuple
-        containing the observation, action, next observation, reward, and done signal.
+        Adds an experience to the memory. Each experience is constructed from the given parameters
+        and stored as a tuple.
 
         Args:
-            *args (Tuple): A tuple representing an experience.
+            observation (NDArray[np.float32]): The current environment observation.
+            action (int): The action taken based on the observation.
+            next_observation (NDArray[np.float32]): The subsequent environment observation following the action.
+            reward (float): The reward received after taking the action.
+            done (bool): A boolean indicating whether the episode has ended.
         """
 
-        self.memory.append(Experience(*args))
+        self.memory.append(Experience(observation, action, next_observation, reward, done))
 
     def sample(self, batch_size: int) -> List[Experience]:
         """
@@ -123,21 +128,21 @@ class DQN:
     A class implementing the Deep Q-Network (DQN) reinforcement learning algorithm.
 
     Attributes:
-        env (gym.Env): The environment in which the agent operates.
-        device (torch.device): The device (CPU or GPU) on which the computations are performed.
-        agent_config (DQNConfig): The agent-specific configuration settings.
-        seed (Optional[int]): Seed value for initialization.
+        env (gym.Env): The gym environment in which the agent will operate.
+        device (torch.device): The device (CPU or GPU) to perform computations.
+        agent_config (DQNConfig): Configuration object containing hyperparameters for the DQN agent.
+        seed (Optional[int]): Optional seed value for initialization to ensure reproducibility.
     """
 
-    def __init__(self, env: gym.Env, device: torch.device, agent_config: DQNConfig, seed: Optional[int]):
+    def __init__(self, env: gym.Env, device: torch.device, agent_config: DQNConfig, seed: Optional[int] = None):
         """
         Initializes the DQN agent with the environment, device, and configuration.
 
         Args:
-            env (gym.Env): The gym environment.
-            device (torch.device): The device(CPU or GPU) to perform computations.
-            agent_config (DQNConfig): The agent-specific configuration settings.
-            seed (Optional[int]): Seed value for initialization.
+            env (gym.Env): The gym environment in which the agent will operate.
+            device (torch.device): The device (CPU or GPU) to perform computations.
+            agent_config (DQNConfig): Configuration object containing hyperparameters for the DQN agent.
+            seed (Optional[int]): Optional seed value for initialization to ensure reproducibility.
         """
 
         self.env = env                                        # The gym environment where the agent will interact
@@ -153,7 +158,9 @@ class DQN:
 
     def learn(self, training_config: TrainingConfig, evaluation_config: Optional[EvaluationConfig] = None):
         """
-        Train the DQN agent using the given training configuration and optionally evaluate during training.
+        Train the DQN agent using the given training configuration and optionally evaluate during training. 
+        Raises errors if evaluation is required by the training configuration but not provided, or if there
+        are mismatches in environment IDs or agent types between training and evaluation configurations.
 
         Args:
             training_config (TrainingConfig): The configuration containing training parameters.
@@ -170,7 +177,7 @@ class DQN:
             raise ValueError('Training and evaluation agent types do not match.')
 
         self.training_config = training_config                    # Configuration for training parameters
-        if evaluation_config is not None:
+        if evaluation_config:
             self.evaluation_config = evaluation_config            # Configuration for evaluation parameters
         self._init_training_parameters()                          # Initialize training parameters
         self._set_seed(self.training_config.seed)                 # Set the seed in various components
@@ -219,8 +226,14 @@ class DQN:
 
     def rollout(self):
         """
-        Executes one episode of interaction with the environment, collecting experience
-        and training the Q network.
+        Executes one episode of interaction with the environment, collecting experiences and updating the agent's
+        policy. The episode is constrained by a maximum number of timesteps. During the episode, actions are
+        selected based on the current policy, experiences are stored, and the agent is trained periodically
+        according to specified intervals.
+
+        This method also handles logging, model checkpointing, and evaluation. It updates exploration rate and
+        records performance metrics like episode return and length. It checks and logs when the agent reaches
+        the predefined  performance threshold.
         """
 
         episode_return = 0                 # Initialize return for the episode
@@ -228,14 +241,14 @@ class DQN:
 
         for episode_t in range(self.max_timesteps_per_episode):                         # Iterate over allowed timesteps
             self.t += 1                                                                 # Increment the global timestep counter
-            action = self.select_action(observation)                                    # Select an action
-            next_observation, reward, terminated, truncated, _ = self.env.step(action)  # Take the action
+            action = self.select_action(observation)                                    # Select an action based on the current observation
+            next_observation, reward, terminated, truncated, _ = self.env.step(action)  # Take the action and observe the outcome
             done = terminated or truncated                                              # Determine if the episode has ended
 
             episode_return += reward                                                    # Update the episode return
-            self.memory.push(observation, action, next_observation, reward, done)       # Remember the experience
+            self.memory.push(observation, action, next_observation, reward, done)       # Store teh experience in memory
 
-            # Update the Q-Network using the collected experiences
+            # Train the Q-Network at specified intervals, after an initial delay
             if self.t >= self.learning_starts and self.t % self.learn_every == 0:
                 self.train()
 
@@ -243,7 +256,7 @@ class DQN:
             if self.checkpoint_frequency > 0 and self.t % self.checkpoint_frequency == 0:
                 self.save_model(self.save_path)
 
-            # Evaluate the agent periodically
+            # Evaluate the agent periodically and log the results if enabled
             if self.evaluate_every > 0 and (self.t % self.evaluate_every == 0 or self.t == 1):
                 average_evaluation_return = self.evaluate(self.evaluation_config)
                 if self.enable_logging:
@@ -263,7 +276,7 @@ class DQN:
             if done:
                 break  # If the episode is finished, exit the loop
 
-            observation = next_observation  # Update the observation
+            observation = next_observation  # Update the observation for the next timestep
 
         self.epsilon = max(self.epsilon * self.eps_decay, self.eps_final)  # Update the exploration rate
 
@@ -281,19 +294,26 @@ class DQN:
         if self.enable_logging:
             if self.episode_i >= self.window_size:
                 self.writer.add_scalar(
-                    'Common/AverageTrainingReturn', np.mean(self.returns_window), self.t)   # Log the average return
+                    'Common/AverageTrainingReturn', np.mean(self.returns_window), self.t)   # Log average training return
                 self.writer.add_scalar(
                     'Common/AverageEpisodeLength', np.mean(self.lengths_window), self.t)    # Log the average episode length
-            self.writer.add_scalar('Common/EpisodeReturn', episode_return, self.episode_i)  # Log the episode return
-            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)   # Log the episode length
+            self.writer.add_scalar('Common/EpisodeReturn', episode_return, self.episode_i)  # Log the return of the current episode
+            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)   # Log the length of the current episode
             self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)             # Log the exploration rate
 
     def train(self):
         """
-        Performs a learning update using the Deep Q-Learning(DQN) algorithm.
+        Performs a learning update using the Deep Q-Learning (DQN) algorithm. This method handles the entire
+        process of fetching a batch of experiences, processing them through the network, calculating the loss,
+        and updating the network parameters. It ensures that updates occur only when enough experiences are
+        available, and it periodically synchronizes the target network with the policy network.
+
+        The training step uses the Bellman equation to update the policy network's Q-values towards their target
+        Q-values, which are estimated using the rewards and the next state's maximum Q-value as predicted by the
+        target network.
         """
 
-        # Check if enough samples are available in memory
+        # Ensure there are enough samples in memory to form a complete minibatch
         if len(self.memory) < self.minibatch_size:
             return
 
@@ -301,21 +321,21 @@ class DQN:
         experiences = self.memory.sample(self.minibatch_size)
         observations, actions, next_observations, rewards, dones = zip(*experiences)
 
-        # Prepare the data by converting to PyTorch tensors for neural network processing
+        # Convert data into tensors suitable for network processing
         observations, actions, next_observations, rewards, dones \
             = self._prepare_tensors(observations, actions, next_observations, rewards, dones)
 
-        # Compute current Q-values from policy network for the actions taken
+        # Compute the Q-values for the actions taken, as predicted by the policy network
         current_q_values = self.policy_net(observations).gather(1, actions.unsqueeze(1)).squeeze(-1)
 
-        # Compute maximum Q-values from target network for next observations
+        # Compute the next state's maximum Q-values from the target network, used for computing the Bellman update
         with torch.no_grad():
             max_q_values, _ = self.target_net(next_observations).max(dim=1)
 
-        # Compute the target Q-values using the Bellman equation
+        # Compute the target Q-values using the reward and the discounted max Q-values from the target network
         target_q_values = rewards + self.gamma * max_q_values * (1 - dones)
 
-        # Calculate loss using the Mean Squared Error loss function
+        # Compute the loss as the mean squared error between the current and target Q-values
         loss = self.MSELoss(current_q_values, target_q_values)
 
         # Perform backpropagation
@@ -323,42 +343,51 @@ class DQN:
         loss.backward()
         self.optimizer.step()
 
-        # Update the target network parameters
+        # Periodically update the target network with weights from the policy network
         self.update_target_network()
 
+        # Log training loss if logging is enabled
         if self.enable_logging:
             self.writer.add_scalar('DQN/Loss', loss, self.t)  # Log the loss
 
     def select_action(self, observation: NDArray[np.float32], deterministic: bool = False) -> int:
         """
-        Selects an action based on the current observation using an epsilon-greedy policy.
+        Selects an action based on the current observation using an epsilon-greedy policy. The method chooses
+        the action with the highest Q-value from the policy network if acting deterministically or under the
+        conditions of exploitation. Otherwise, it randomly selects an action with a probability defined by the
+        epsilon value, promoting exploration.
 
         Args:
-            observation(NDArray[np.float32]): The current state observation from the environment.
-            deterministic(bool): If True, the action choice is deterministic(the max value action).
-                                 If False, the action is chosen stochastically with epsilon-greedy.
+            observation (NDArray[np.float32]): The current state observation from the environment.
+            deterministic (bool): If True, always selects the action with the highest Q-value (exploitation). \
+                                  If False, occasionally selects a random action based on epsilon (exploration).
 
         Returns:
-            int: The action selected by the agent.
+            int: The action selected by the agent, either deterministically or stochastically.
         """
 
-        # Decide whether to select the best action based on model prediction or sample randomly
         if np.random.random() > self.epsilon or deterministic:
-            # Convert the observation to a tensor and add a batch dimension (batch size = 1)
+            # Prepare the observation: convert to tensor, add batch dimension, and transfer to the device
             observation = torch.tensor(observation, dtype=torch.float32).unsqueeze(0).to(self.device)
-            # Model prediction: Compute Q-values for all actions, without gradient computation
+            # Compute Q-values for all actions using the policy network
             with torch.no_grad():
                 q_values = self.policy_net(observation).squeeze()
-            # Select the action with the highest Q-value
+            # Select the action with the maximum Q-value
             action = torch.argmax(q_values).item()
         else:
-            # Randomly sample an action from the action space
+            # Randomly select an action from the available action space
             action = self.env.action_space.sample()
+
         return action
 
     def update_target_network(self):
         """
-        Updates the target network by partially copying the weights from the policy network.
+        Updates the target network by partially copying the weights from the policy network, implementing a soft
+        update. The soft update helps to stabilize training by blending weights of the policy network with the 
+        previous weights of the target network, controlled by a factor tau.
+
+        This method uses the weighted sum of the corresponding weights from both networks, where tau is the
+        blend ratio.
         """
 
         for policy_param, target_param in zip(self.policy_net.parameters(), self.target_net.parameters()):
@@ -366,21 +395,21 @@ class DQN:
 
     def evaluate(self, evaluation_config: EvaluationConfig) -> float:
         """
-        Evaluate the agent based on the given configuration.
+        Evaluates the DQN agent by running it through a series of episodes in an evaluation environment,
+        according to the provided configuration. It temporarily alters random states for reproducibility,
+        records evaluation episodes if configured, and safely restores states afterwards.
 
         Args:
             evaluation_config (EvaluationConfig): Configuration object containing evaluation parameters.
 
         Returns:
-            float: Average return across all evaluation episodes.
+            float: Average return across all evaluation episodes, calculated as the sum of rewards obtained per \
+            episode divided by the number of episodes.
         """
 
         def extract_timestamp() -> str:
             """Extract the first timestamp from any of the provided paths or generate a new one."""
-
             timestamp_pattern = r'\d{8}\-\d{6}|\d{8}\d{6}'
-
-            # Attempt to extract the timestamp from agent attributes
             for attr in ['log_dir', 'save_path']:
                 if hasattr(self, attr):
                     value = getattr(self, attr, None)
@@ -388,8 +417,6 @@ class DQN:
                         match = re.search(timestamp_pattern, value)
                         if match:
                             return match.group(0)
-
-            # Fallback to a new timestamp if no match is found
             return datetime.now().strftime('%Y%m%d%H%M%S')
 
         # Save the current random states to avoid interference
@@ -471,10 +498,16 @@ class DQN:
 
     def is_environment_solved(self):
         """
-        Check if the environment is solved.
+        Determines whether the environment is considered solved based on the agent's performance. 
+        The environment is deemed solved if the mean of the returns, minus their standard deviation, 
+        exceeds a predefined threshold. This calculation provides a conservative estimate of the 
+        agent's performance, ensuring consistency over multiple episodes before declaring the 
+        environment solved.
 
         Returns:
-            bool: True if the environment is solved, False otherwise.
+            bool: True if the environment is solved by the above criterion, False otherwise. This \
+                requires having a sufficient number of episodes (at least 'window_size') to form \
+                a statistically significant assessment.
         """
 
         if len(self.returns_window) < self.window_size:
@@ -484,12 +517,13 @@ class DQN:
 
     def save_model(self, file_path: str, save_optimizer: bool = True):
         """
-        Saves the policy network's model parameters to the specified file path.
-        Optionally, it also saves the optimizer state.
+        Saves the policy network's model parameters to the specified file path. Optionally, it also saves
+        the optimizer state. This function is useful for checkpointing the model during training or saving
+        the final trained model.
 
         Args:
-            file_path(str): The path to the file where the model parameters are to be saved.
-            save_optimizer(bool): If True, saves the optimizer state as well. Defaults to False.
+            file_path (str): The path to the file where the model parameters are to be saved.
+            save_optimizer (bool): If True, saves the optimizer state along with the model parameters.
         """
 
         model_and_or_optim = {'model_state_dict': self.policy_net.state_dict()}
@@ -499,12 +533,13 @@ class DQN:
 
     def load_model(self, file_path: str, load_optimizer: bool = True):
         """
-        Loads model parameters into the policy network and copies them to the target network.
-        Optionally, it also loads the optimizer state.
+        Loads model parameters into the policy network from a specified file and also ensures the target
+        network is synchronized with the policy network. Optionally, it can also load the optimizer state
+        if it was saved.
 
         Args:
-            file_path(str): The path to the file from which to load the model parameters.
-            load_optimizer(bool): If True, loads the optimizer state as well. Defaults to False.
+            file_path (str): The path to the file from which to load the model parameters.
+            load_optimizer (bool): If True, also loads the optimizer state, assuming it is available.
         """
 
         model_and_or_optim = torch.load(file_path)
@@ -513,20 +548,23 @@ class DQN:
         if load_optimizer and 'optimizer_state_dict' in model_and_or_optim:
             self.optimizer.load_state_dict(model_and_or_optim['optimizer_state_dict'])
 
-    def _prepare_tensors(self, observations, actions, next_observations, rewards, dones):
+    def _prepare_tensors(self, observations: Tuple[NDArray[np.float32], ...], actions: Tuple[int, ...],
+                         next_observations: Tuple[NDArray[np.float32], ...], rewards: Tuple[float, ...],
+                         dones: Tuple[bool, ...]):
         """
-        Converts lists of observations, actions, next_observations, rewards, and dones
-        into tensors and sends them to the specified device.
+        Converts lists of observations, actions, log probabilities, and advantages into tensors
+        and transfers them to the specified computing device. This step is critical for batching
+        and processing the data efficiently in neural network operations.
 
         Args:
-            observations: List of observations from the environment.
-            actions: List of actions taken.
-            next_observations: List of observations following the actions.
-            rewards: List of received rewards.
-            dones: List indicating whether an episode is finished.
+            observations (List[NDArray[np.float32]]): List of environment observations, each as a NumPy array.
+            actions (List[int]): List of actions taken by the agent, each an integer representing a discrete action.
+            log_probs (List[torch.Tensor]): List of log probabilities of the actions taken, each a single-element tensor.
+            advantages (List[torch.Tensor]): List of advantage estimates used for updating the policy, each a single-element tensor.
 
         Returns:
-            Tuple of Tensors: Prepared tensors of observations, actions, next_observations, rewards, and dones.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: Tensors of observations, actions, log \
+                probabilities,  and advantages, all formatted and moved to the appropriate device for training.
         """
 
         observations = torch.tensor(np.stack(observations), dtype=torch.float32).to(self.device)

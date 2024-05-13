@@ -38,8 +38,7 @@ class TrainingConfig(BaseExperimentConfig):
         kwargs (Dict[str, Any]): Additional keyword arguments for gym environment customization.
         seed (Optional[int]): A global random seed for reproducibility. Defaults to `None`, which generates a seed.
         n_timesteps (int): The total number of timesteps for training. Must be positive. This is a required field.
-        evaluate_every (int): The interval at which evaluation is performed during training, in timesteps.
-                              If non-positive, evaluation is disabled.
+        evaluate_every (int): The interval at which evaluation is performed during training, in timesteps. If non-positive, evaluation is disabled.
         score_threshold (int): The score threshold to define when the environment is considered solved.
         window_size (int): The window size for calculating rolling average scores and average episode length. Must be positive.
         max_timesteps_per_episode (int): Maximum timesteps per episode. Must be positive.
