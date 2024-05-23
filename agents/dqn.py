@@ -187,36 +187,9 @@ class DQN:
         self.episode_i = 0                                        # Initialize episode counter
         self.returns_window = deque([], maxlen=self.window_size)  # Used for tracking the average returns
         self.lengths_window = deque([], maxlen=self.window_size)  # Used for tracking the average episode lengths
-        self.threshold_reached = False                            # Track if 'conventional' threshold is reached
 
         while self.t < self.n_timesteps:
             self.rollout()  # Perform one episode of interaction with the environment
-
-            # Check for early stopping if the environment is considered solved
-            if self.is_environment_solved():
-                str1 = f'Environment solved on timestep {self.t}!'
-                str1 = str1.center(88)
-                if self.print_every > 0:
-                    print(f'\n{str1}', end='')
-                break
-
-        # Final evaluation
-        if self.evaluate_every > 0:
-            average_evaluation_return = self.evaluate(self.evaluation_config)
-            if self.enable_logging:
-                self.writer.add_scalar('Common/EvaluationReturn', average_evaluation_return, self.t)
-        else:
-            average_evaluation_return = None
-
-        # Print training summary
-        if self.print_every > 0:
-            str2 = f'Training Return: {np.mean(self.returns_window):.3f}'
-            if average_evaluation_return is not None:
-                str3 = f'Evaluation Return: {average_evaluation_return:.3f}'
-            else:
-                str3 = None
-            str4 = f'Number of Episodes: {self.episode_i}'
-            print(f'\n    {str2}  ' + (f'|  {str3}  ' if str3 else '') + f'|  {str4}')
 
         # Final save and close the logger
         if self.checkpoint_frequency > 0:
@@ -257,10 +230,10 @@ class DQN:
                 self.save_model(self.save_path)
 
             # Evaluate the agent periodically and log the results if enabled
-            if self.evaluate_every > 0 and (self.t % self.evaluate_every == 0 or self.t == 1):
+            if self.evaluate_every > 0 and self.t % self.evaluate_every == 0:
                 average_evaluation_return = self.evaluate(self.evaluation_config)
                 if self.enable_logging:
-                    self.writer.add_scalar('Common/EvaluationReturn', average_evaluation_return, self.t)
+                    self.writer.add_scalar('Evaluation/AverageEvaluationReturn', average_evaluation_return, self.t)
             else:
                 average_evaluation_return = None
 
@@ -284,22 +257,15 @@ class DQN:
         self.returns_window.append(episode_return)  # Record the episode return
         self.lengths_window.append(episode_t + 1)   # Record the episode length
 
-        # Print when 'conventional' threshold first reached
-        if self.print_every > 0 and len(self.returns_window) == self.window_size \
-                and np.mean(self.returns_window) >= self.score_threshold and not self.threshold_reached:
-            str5 = f'Score threshold reached on timestep {self.t}.'
-            print('\n' + str5.center(88) + '\n')
-            self.threshold_reached = True
-
         if self.enable_logging:
             if self.episode_i >= self.window_size:
                 self.writer.add_scalar(
-                    'Common/AverageTrainingReturn', np.mean(self.returns_window), self.t)   # Log average training return
+                    'Training/AvgTrainingReturn', np.mean(self.returns_window), self.t)       # Log average training return
                 self.writer.add_scalar(
-                    'Common/AverageEpisodeLength', np.mean(self.lengths_window), self.t)    # Log the average episode length
-            self.writer.add_scalar('Common/EpisodeReturn', episode_return, self.episode_i)  # Log the return of the current episode
-            self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)   # Log the length of the current episode
-            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)             # Log the exploration rate
+                    'Training/AvgEpisodeLength', np.mean(self.lengths_window), self.t)        # Log the average episode length
+            self.writer.add_scalar('Episodic/EpisodeReturn', episode_return, self.episode_i)  # Log the return of the current episode
+            self.writer.add_scalar('Episodic/EpisodeLength', episode_t + 1, self.episode_i)   # Log the length of the current episode
+            self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)               # Log the exploration rate
 
     def train(self):
         """

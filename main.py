@@ -96,6 +96,7 @@ def main(args):
         device=device,
         n_timesteps=training_timesteps,
         seed=training_seed,
+        score_threshold=int(1e6)  # An arbitrarily large score threshold
     )
 
     # Set up the evaluation configuration

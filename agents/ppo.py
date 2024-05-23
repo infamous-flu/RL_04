@@ -248,7 +248,7 @@ class PPO:
                 if self.evaluate_every > 0 and (self.t % self.evaluate_every == 0 or self.t == 1):
                     average_evaluation_return = self.evaluate(self.evaluation_config)
                     if self.enable_logging:
-                        self.writer.add_scalar('Common/EvaluationReturn', average_evaluation_return, self.t)
+                        self.writer.add_scalar('Evaluation/AverageEvaluationReturn', average_evaluation_return, self.t)
                 else:
                     average_evaluation_return = None
 
@@ -287,11 +287,11 @@ class PPO:
             if self.enable_logging:
                 if self.episode_i >= self.window_size:
                     self.writer.add_scalar(
-                        'Common/AverageTrainingReturn', np.mean(self.returns_window), self.t)   # Log the average return
+                        'Training/AverageTrainingReturn', np.mean(self.returns_window), self.t)   # Log the average return
                     self.writer.add_scalar(
-                        'Common/AverageEpisodeLength', np.mean(self.lengths_window), self.t)    # Log the average episode length
-                self.writer.add_scalar('Common/EpisodeReturn', episode_return, self.episode_i)  # Log the episode return
-                self.writer.add_scalar('Common/EpisodeLength', episode_t + 1, self.episode_i)   # Log the episode length
+                        'Training/AverageEpisodeLength', np.mean(self.lengths_window), self.t)    # Log the average episode length
+                self.writer.add_scalar('Episode/EpisodeReturn', episode_return, self.episode_i)  # Log the episode return
+                self.writer.add_scalar('Episode/EpisodeLength', episode_t + 1, self.episode_i)   # Log the episode length
 
             # Stop the rollout if environment is considered solved
             if self.is_environment_solved():
