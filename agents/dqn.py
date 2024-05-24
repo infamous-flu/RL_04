@@ -260,9 +260,9 @@ class DQN:
         if self.enable_logging:
             if self.episode_i >= self.window_size:
                 self.writer.add_scalar(
-                    'Training/AvgTrainingReturn', np.mean(self.returns_window), self.t)       # Log average training return
+                    'Training/AverageTrainingReturn', np.mean(self.returns_window), self.t)       # Log average training return
                 self.writer.add_scalar(
-                    'Training/AvgEpisodeLength', np.mean(self.lengths_window), self.t)        # Log the average episode length
+                    'Training/AverageEpisodeLength', np.mean(self.lengths_window), self.t)        # Log the average episode length
             self.writer.add_scalar('Episodic/EpisodeReturn', episode_return, self.episode_i)  # Log the return of the current episode
             self.writer.add_scalar('Episodic/EpisodeLength', episode_t + 1, self.episode_i)   # Log the length of the current episode
             self.writer.add_scalar('DQN/ExplorationRate', self.epsilon, self.t)               # Log the exploration rate

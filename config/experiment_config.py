@@ -49,7 +49,7 @@ class TrainingConfig(BaseExperimentConfig):
         save_path (Optional[str]): Path to save the model. If not provided, a default path is generated.
     """
 
-    n_timesteps: int = int(3e5)
+    n_timesteps: int = int(2e5)
     evaluate_every: int = 10000
     score_threshold: int = 200
     window_size: int = 100

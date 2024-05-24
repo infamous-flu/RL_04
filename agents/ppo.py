@@ -169,34 +169,8 @@ class PPO:
         while self.t < self.n_timesteps:
             observations, actions, log_probs, rewards, values = self.rollout()  # Collect a batch of trajectories
 
-            # Check for early stopping if the environment is considered solved
-            if self.is_environment_solved():
-                str1 = f'Environment solved on timestep {self.t}!'
-                str1 = str1.center(88)
-                if self.print_every > 0:
-                    print(f'\n{str1}', end='')
-                break
-
             # Learn using the collected batch of trajectories
             self.train(observations, actions, log_probs, rewards, values)
-
-        # Final evaluation
-        if self.evaluate_every > 0:
-            average_evaluation_return = self.evaluate(self.evaluation_config)
-            if self.enable_logging:
-                self.writer.add_scalar('Common/EvaluationReturn', average_evaluation_return, self.t)
-        else:
-            average_evaluation_return = None
-
-        # Print training summary
-        if self.print_every > 0:
-            str2 = f'Training Return: {np.mean(self.returns_window):.3f}'
-            if average_evaluation_return is not None:
-                str3 = f'Evaluation Return: {average_evaluation_return:.3f}'
-            else:
-                str3 = None
-            str4 = f'Number of Episodes: {self.episode_i}'
-            print(f'\n    {str2}  ' + (f'|  {str3}  ' if str3 else '') + f'|  {str4}')
 
         # Final save and close the logger
         if self.checkpoint_frequency > 0:
@@ -210,7 +184,7 @@ class PPO:
         Executes one rollout to collect training data until a batch of trajectories is filled
         or the environment is considered solved. This method captures the sequence of observations,
         actions, corresponding log probabilities of actions, rewards, and estimated values from the
-        environment until the specified batch size is reached or a termination condition is met.
+        environment until the specified batch size is reached.
 
         Returns:
             A tuple containing:
@@ -277,25 +251,14 @@ class PPO:
             self.returns_window.append(episode_return)  # Record the episode return
             self.lengths_window.append(episode_t + 1)   # Record the episode length
 
-            # Print when 'conventional' threshold first reached
-            if self.print_every > 0 and self.episode_i >= self.window_size \
-                    and np.mean(self.returns_window) >= self.score_threshold and not self.threshold_reached:
-                str5 = f'Score threshold reached on timestep {self.t}.'
-                print('\n' + str5.center(88) + '\n')
-                self.threshold_reached = True
-
             if self.enable_logging:
                 if self.episode_i >= self.window_size:
                     self.writer.add_scalar(
                         'Training/AverageTrainingReturn', np.mean(self.returns_window), self.t)   # Log the average return
                     self.writer.add_scalar(
                         'Training/AverageEpisodeLength', np.mean(self.lengths_window), self.t)    # Log the average episode length
-                self.writer.add_scalar('Episode/EpisodeReturn', episode_return, self.episode_i)  # Log the episode return
-                self.writer.add_scalar('Episode/EpisodeLength', episode_t + 1, self.episode_i)   # Log the episode length
-
-            # Stop the rollout if environment is considered solved
-            if self.is_environment_solved():
-                break
+                self.writer.add_scalar('Episodic/EpisodeReturn', episode_return, self.episode_i)  # Log the episode return
+                self.writer.add_scalar('Episodic/EpisodeLength', episode_t + 1, self.episode_i)   # Log the episode length
 
         return observations, actions, log_probs, rewards, values
 
