@@ -17,6 +17,7 @@ class BaseExperimentConfig:
         device (torch.device): The computation device, either CPU or GPU (CUDA), based on system availability.
         seed (Optional[int]): A global random seed for reproducibility. Defaults to `None`, which generates a seed.
         kwargs (Dict[str, Any]): Additional keyword arguments for gym environment customization.
+        max_timesteps_per_episode (int): Maximum timesteps per episode. Must be positive.
     """
 
     env_id: str
@@ -24,6 +25,7 @@ class BaseExperimentConfig:
     device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     seed: Optional[int] = None
     kwargs: Dict[str, Any] = field(default_factory=dict)
+    max_timesteps_per_episode: int = 1000
 
 
 @dataclass(kw_only=True)
@@ -41,7 +43,6 @@ class TrainingConfig(BaseExperimentConfig):
         evaluate_every (int): The interval at which evaluation is performed during training, in timesteps. If non-positive, evaluation is disabled.
         score_threshold (int): The score threshold to define when the environment is considered solved.
         window_size (int): The window size for calculating rolling average scores and average episode length. Must be positive.
-        max_timesteps_per_episode (int): Maximum timesteps per episode. Must be positive.
         print_every (int): How often to print scores (in timesteps). Non-positive values disable printing.
         enable_logging (bool): Whether logging is enabled or not. Defaults to `True`. 
         log_dir (Optional[str]): Directory for storing TensorBoard logs. If not provided, a default is generated.
@@ -53,7 +54,6 @@ class TrainingConfig(BaseExperimentConfig):
     evaluate_every: int = 10000
     score_threshold: int = 200
     window_size: int = 100
-    max_timesteps_per_episode: int = 1000
     print_every: int = 10000
     enable_logging: bool = True
     log_dir: Optional[str] = None
@@ -100,6 +100,7 @@ class EvaluationConfig(BaseExperimentConfig):
         device (torch.device): The computation device, either CPU or GPU (CUDA), based on system availability.
         seed (Optional[int]): A global random seed for reproducibility. Defaults to `None`, which generates a seed.
         kwargs (Dict[str, Any]): Additional keyword arguments for gym environment customization.
+        max_timesteps_per_episode (int): Maximum timesteps per episode. Must be positive.
         n_episodes (int): Number of episodes to run during evaluation. Must be positive.
         deterministic (bool): Whether to select actions deterministically or allow exploration. Defaults to True.
         record_every (int): Specifies the interval at which episodes should be recorded. Non-positive values disable recording.

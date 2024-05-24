@@ -395,6 +395,10 @@ class DQN:
             if evaluation_config.seed is None:
                 evaluation_config.seed = int(time.time() * 1000) % (2 ** 32 - 1)
 
+            # Create dummy timestep if needed:
+            if not hasattr(self, 't'):
+                self.t = 0
+
             # Calculate the initial seed for this evaluation
             eval_seed = evaluation_config.seed + self.t // 10000
 
@@ -406,7 +410,7 @@ class DQN:
             # Generate default video folder if not provided
             if evaluation_config.video_folder is None:
                 timestamp = extract_timestamp()
-                video_folder = os.path.join('recordings', self.env_id, 'dqn', timestamp)
+                video_folder = os.path.join('recordings', evaluation_config.env_id, 'dqn', timestamp)
             else:
                 video_folder = evaluation_config.video_folder
 
@@ -417,7 +421,7 @@ class DQN:
                 name_prefix = evaluation_config.name_prefix
 
             # Create the evaluation environment
-            eval_env = gym.make(self.env_id, render_mode='rgb_array', **evaluation_config.kwargs)
+            eval_env = gym.make(evaluation_config.env_id, render_mode='rgb_array', **evaluation_config.kwargs)
 
             # Enable video recording if specified
             with warnings.catch_warnings():
@@ -438,7 +442,7 @@ class DQN:
                 episode_return = 0
                 observation, _ = eval_env.reset(seed=eval_seed)
                 terminated, truncated = False, False
-                for _ in range(self.max_timesteps_per_episode):
+                for _ in range(evaluation_config.max_timesteps_per_episode):
                     action = self.select_action(
                         observation, deterministic=evaluation_config.deterministic
                     )
