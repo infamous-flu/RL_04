@@ -95,8 +95,7 @@ def main(args):
         agent_type=agent_type,
         device=device,
         n_timesteps=training_timesteps,
-        seed=training_seed,
-        score_threshold=int(1e6)  # An arbitrarily large score threshold
+        seed=training_seed
     )
 
     # Set up the evaluation configuration
@@ -107,7 +106,7 @@ def main(args):
         env_id=env_id,
         agent_type=agent_type,
         n_episodes=evaluation_episodes,
-        seed=evaluation_seed,
+        seed=evaluation_seed
     )
 
     # Print a summary of the current configuration

@@ -164,7 +164,6 @@ class PPO:
         self.episode_i = 0                                        # Initialize episode counter
         self.returns_window = deque([], maxlen=self.window_size)  # Used for tracking the average returns
         self.lengths_window = deque([], maxlen=self.window_size)  # Used for tracking the average episode lengths
-        self.threshold_reached = False                            # Track if 'conventional' threshold is reached
 
         while self.t < self.n_timesteps:
             observations, actions, log_probs, rewards, values = self.rollout()  # Collect a batch of trajectories
@@ -181,10 +180,10 @@ class PPO:
     def rollout(self) -> Tuple[List[NDArray[np.float32]], List[int], List[torch.Tensor],
                                List[List[float]], List[List[torch.Tensor]]]:
         """
-        Executes one rollout to collect training data until a batch of trajectories is filled
-        or the environment is considered solved. This method captures the sequence of observations,
-        actions, corresponding log probabilities of actions, rewards, and estimated values from the
-        environment until the specified batch size is reached.
+        Executes one rollout to collect training data until a batch of trajectories is filled. This
+        method captures the sequence of observations, actions, corresponding log probabilities of
+        actions, rewards, and estimated values from the environment until the specified batch size
+        is reached.
 
         Returns:
             A tuple containing:
@@ -661,11 +660,10 @@ class PPO:
         """
 
         self.env_id = self.training_config.env_id
+        self.max_timesteps_per_episode = self.training_config.max_timesteps_per_episode
         self.n_timesteps = self.training_config.n_timesteps
         self.evaluate_every = self.training_config.evaluate_every
-        self.score_threshold = self.training_config.score_threshold
         self.window_size = self.training_config.window_size
-        self.max_timesteps_per_episode = self.training_config.max_timesteps_per_episode
         self.print_every = self.training_config.print_every
         self.enable_logging = self.training_config.enable_logging
         self.log_dir = self.training_config.log_dir

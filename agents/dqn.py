@@ -205,8 +205,7 @@ class DQN:
         according to specified intervals.
 
         This method also handles logging, model checkpointing, and evaluation. It updates exploration rate and
-        records performance metrics like episode return and length. It checks and logs when the agent reaches
-        the predefined  performance threshold.
+        records performance metrics like episode return and length.
         """
 
         episode_return = 0                 # Initialize return for the episode
@@ -564,7 +563,6 @@ class DQN:
         self.env_id = self.training_config.env_id
         self.n_timesteps = self.training_config.n_timesteps
         self.evaluate_every = self.training_config.evaluate_every
-        self.score_threshold = self.training_config.score_threshold
         self.window_size = self.training_config.window_size
         self.max_timesteps_per_episode = self.training_config.max_timesteps_per_episode
         self.print_every = self.training_config.print_every
