@@ -466,25 +466,6 @@ class DQN:
 
         return average_evaluation_return
 
-    def is_environment_solved(self):
-        """
-        Determines whether the environment is considered solved based on the agent's performance. 
-        The environment is deemed solved if the mean of the returns, minus their standard deviation, 
-        exceeds a predefined threshold. This calculation provides a conservative estimate of the 
-        agent's performance, ensuring consistency over multiple episodes before declaring the 
-        environment solved.
-
-        Returns:
-            bool: True if the environment is solved by the above criterion, False otherwise. This \
-                requires having a sufficient number of episodes (at least 'window_size') to form \
-                a statistically significant assessment.
-        """
-
-        if len(self.returns_window) < self.window_size:
-            return False  # Not enough scores for a valid evaluation
-
-        return np.mean(self.returns_window) - np.std(self.returns_window) > self.score_threshold
-
     def save_model(self, file_path: str, save_optimizer: bool = True):
         """
         Saves the policy network's model parameters to the specified file path. Optionally, it also saves
