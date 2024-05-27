@@ -42,7 +42,6 @@ class TrainingConfig(BaseExperimentConfig):
         max_timesteps_per_episode (int): Maximum timesteps per episode. Must be positive.
         n_timesteps (int): The total number of timesteps for training. Must be positive. This is a required field.
         evaluate_every (int): The interval at which evaluation is performed during training, in timesteps. If non-positive, evaluation is disabled.
-        score_threshold (int): The score threshold to define when the environment is considered solved.
         window_size (int): The window size for calculating rolling average scores and average episode length. Must be positive.
         print_every (int): How often to print scores (in timesteps). Non-positive values disable printing.
         enable_logging (bool): Whether logging is enabled or not. Defaults to `True`. 
@@ -53,7 +52,6 @@ class TrainingConfig(BaseExperimentConfig):
 
     n_timesteps: int = int(2e5)
     evaluate_every: int = 10000
-    score_threshold: int = 200
     window_size: int = 100
     print_every: int = 10000
     enable_logging: bool = True
